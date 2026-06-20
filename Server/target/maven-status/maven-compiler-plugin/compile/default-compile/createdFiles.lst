@@ -1,10 +1,14 @@
 com\cafepos\entity\Coupon.class
 com\cafepos\enums\PaymentStatus.class
 com\cafepos\enums\PaymentType.class
+com\cafepos\service\ProductService.class
+com\cafepos\service\CategoryService.class
 com\cafepos\dto\AuthResponse.class
 com\cafepos\enums\Role.class
+com\cafepos\controller\CategoryController.class
 com\cafepos\security\SecurityConfig.class
 com\cafepos\OdooCafePosApplication.class
+com\cafepos\service\EmailService.class
 com\cafepos\entity\PosSession.class
 com\cafepos\entity\Promotion.class
 com\cafepos\entity\PaymentMethod.class
@@ -13,6 +17,7 @@ com\cafepos\entity\Product.class
 com\cafepos\enums\PromotionAppliesTo.class
 com\cafepos\security\JwtUtil.class
 com\cafepos\entity\Customer.class
+com\cafepos\controller\ProductController.class
 com\cafepos\entity\AppUser.class
 com\cafepos\controller\AuthController.class
 com\cafepos\entity\Floor.class
@@ -29,7 +34,13 @@ com\cafepos\security\JwtAuthFilter.class
 com\cafepos\entity\RestaurantTable.class
 com\cafepos\dto\AuthResponse$AuthResponseBuilder.class
 com\cafepos\dto\SignupRequest.class
+com\cafepos\repository\PaymentMethodRepository.class
 com\cafepos\enums\KitchenStatus.class
+com\cafepos\repository\ProductRepository.class
 com\cafepos\dto\LoginRequest.class
+com\cafepos\repository\CategoryRepository.class
 com\cafepos\enums\DiscountType.class
+com\cafepos\service\PaymentMethodService.class
+com\cafepos\dto\ChangePasswordRequest.class
 com\cafepos\entity\Category.class
+com\cafepos\controller\PaymentMethodController.class

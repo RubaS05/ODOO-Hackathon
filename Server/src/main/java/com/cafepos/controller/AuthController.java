@@ -6,8 +6,10 @@ import com.cafepos.dto.SignupRequest;
 import com.cafepos.entity.AppUser;
 import com.cafepos.enums.Role;
 import com.cafepos.repository.AppUserRepository;
+import com.cafepos.dto.ChangePasswordRequest;
 import com.cafepos.security.CustomUserDetails;
 import com.cafepos.security.JwtUtil;
+import com.cafepos.service.EmailService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,6 +29,7 @@ public class AuthController {
     private final AppUserRepository appUserRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final EmailService emailService;
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@Valid @RequestBody SignupRequest request) {
@@ -42,6 +45,8 @@ public class AuthController {
         user.setRole(Role.ADMIN);
 
         AppUser savedUser = appUserRepository.save(user);
+
+        emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getName());
 
         return ResponseEntity.ok("User registered successfully");
     }
@@ -66,5 +71,24 @@ public class AuthController {
                 .build();
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest request, Authentication authentication) {
+        if (authentication == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not authenticated");
+        }
+        
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        AppUser appUser = userDetails.getAppUser();
+
+        if (!passwordEncoder.matches(request.getOldPassword(), appUser.getPassword())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Incorrect old password");
+        }
+
+        appUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        appUserRepository.save(appUser);
+
+        return ResponseEntity.ok("Password changed successfully");
     }
 }

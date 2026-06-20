@@ -1,5 +1,9 @@
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\AuthController.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\CategoryController.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\PaymentMethodController.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\ProductController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\AuthResponse.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\ChangePasswordRequest.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\LoginRequest.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\SignupRequest.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\entity\AppUser.java
@@ -27,8 +31,15 @@ D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\enums\SelfOrderMode.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\enums\SessionStatus.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\OdooCafePosApplication.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\AppUserRepository.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\CategoryRepository.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\PaymentMethodRepository.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\ProductRepository.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\security\CustomUserDetails.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\security\CustomUserDetailsService.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\security\JwtAuthFilter.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\security\JwtUtil.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\security\SecurityConfig.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\CategoryService.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\EmailService.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\PaymentMethodService.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\ProductService.java

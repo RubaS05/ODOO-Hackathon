@@ -39,6 +39,9 @@ const CustomerDashboard = () => {
     // Active tab
     const [activeTab, setActiveTab] = useState('menu'); // 'menu' | 'cart' | 'orders'
 
+    // Order type (Dine-in vs Takeaway)
+    const [orderType, setOrderType] = useState('dine-in');
+
     // Category filter
     const [selectedCatId, setSelectedCatId] = useState('all');
 
@@ -78,11 +81,27 @@ const CustomerDashboard = () => {
     const myOrders = useMemo(() => {
         return orders.filter(
             (o) => o.tableId === tableId && (o.customerEmail === customer?.email || o.source === 'customer')
-        ).sort((a, b) => new Date(b.date) - new Date(a.date));
+        ).sort((a, b) => new Date(b.date || o.orderDate) - new Date(a.date || a.orderDate));
     }, [orders, tableId, customer]);
 
-    // Current (latest non-completed) order
-    const currentOrder = myOrders.find((o) => !['completed', 'cancelled'].includes(o.status));
+    // Current (latest non-completed/paid) order
+    const currentOrder = myOrders.find((o) => !['completed', 'cancelled', 'paid'].includes(o.status?.toLowerCase()));
+
+    // ── Order Tracking Polling ──
+    useEffect(() => {
+        let interval;
+        if (currentOrder && activeTab === 'orders') {
+            interval = setInterval(async () => {
+                try {
+                    const fetched = await apiService.public.getOrder(currentOrder.id);
+                    usePOSStore.getState().updateOrder(currentOrder.id, fetched);
+                } catch (e) {
+                    console.error("Polling error", e);
+                }
+            }, 5000);
+        }
+        return () => clearInterval(interval);
+    }, [currentOrder, activeTab]);
 
     // ── Filtered products ──
     const visibleProducts = useMemo(() => {
@@ -114,43 +133,72 @@ const CustomerDashboard = () => {
 
     const getQty = (productId) => cart.find((i) => i.id === productId)?.quantity || 0;
 
-    // ── Payment ──
-    const handlePayAndOrder = () => {
+    // ── Payment & Actions ──
+    const isDineIn = orderType === 'dine-in';
+
+    const handleAction = async () => {
         if (cart.length === 0) return;
-        setPaymentOpen(true);
+        if (isDineIn) {
+            // Dine-in: Send to kitchen directly (create or append)
+            try {
+                if (currentOrder) {
+                    await apiService.public.appendItems(currentOrder.id, cart.map(i => ({ productId: i.id, quantity: i.quantity })));
+                    const fetched = await apiService.public.getOrder(currentOrder.id);
+                    usePOSStore.getState().updateOrder(currentOrder.id, fetched);
+                } else {
+                    const newOrderDto = await apiService.public.createOrder({
+                        tableId: table?.id,
+                        customerId: customer?.id,
+                        notes: `Customer Name: ${customer?.name}, Email: ${customer?.email}`,
+                        orderType: 'dine-in',
+                        sendToKitchen: true,
+                        items: cart.map(i => ({ productId: i.id, quantity: i.quantity }))
+                    });
+                    createCustomerOrder(newOrderDto);
+                }
+                setCart([]);
+                setActiveTab('orders');
+            } catch (err) {
+                console.error(err);
+                alert("Failed to submit order to kitchen.");
+            }
+        } else {
+            // Takeaway: Require payment upfront
+            setPaymentOpen(true);
+        }
     };
 
     const confirmPayment = () => {
         setPaying(true);
         setTimeout(async () => {
             try {
-                // 1. Submit order to backend
-                const newOrderDto = await apiService.public.createOrder({
-                    tableId: table?.id,
-                    customerId: customer?.id, // Note: backend doesn't require this, but pass if we have it
-                    notes: `Customer Name: ${customer?.name}, Email: ${customer?.email}`,
-                    paymentMethod,
-                    items: cart.map(i => ({ productId: i.id, quantity: i.quantity }))
-                });
+                if (isDineIn && currentOrder) {
+                    // Deferred payment for Dine-in
+                    const updated = await apiService.public.payOrder(currentOrder.id);
+                    usePOSStore.getState().updateOrder(currentOrder.id, { ...updated, paymentMethod });
+                } else {
+                    // Upfront payment for Takeaway
+                    const newOrderDto = await apiService.public.createOrder({
+                        tableId: table?.id,
+                        customerId: customer?.id,
+                        notes: `Customer Name: ${customer?.name}, Email: ${customer?.email}`,
+                        orderType: 'takeaway',
+                        paymentMethod,
+                        items: cart.map(i => ({ productId: i.id, quantity: i.quantity }))
+                    });
+                    createCustomerOrder({
+                        ...newOrderDto,
+                        paymentMethod,
+                    });
+                }
 
-                // 2. Add to local store so dashboard updates immediately
-                createCustomerOrder({
-                    ...newOrderDto,
-                    tableNumber: table?.number,
-                    customerName: customer?.name,
-                    customerEmail: customer?.email,
-                    items: cart, // keep local items for display
-                    paymentMethod,
-                });
-
-                setLastOrderId(newOrderDto.id);
                 setCart([]);
                 setPaymentOpen(false);
                 setPaying(false);
                 setActiveTab('orders');
             } catch (err) {
-                console.error("Order failed", err);
-                alert("Failed to submit order.");
+                console.error("Payment failed", err);
+                alert("Failed to process payment.");
                 setPaying(false);
             }
         }, 1200);
@@ -202,6 +250,20 @@ const CustomerDashboard = () => {
                 <button onClick={handleLogout} style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>
                     Change User
                 </button>
+            </div>
+
+            {/* ── Order Type Toggle ── */}
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', padding: '12px', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '99px', padding: '6px' }}>
+                    <button onClick={() => setOrderType('dine-in')} style={{
+                        padding: '6px 16px', borderRadius: '99px', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', transition: 'all 0.2s',
+                        background: orderType === 'dine-in' ? '#f59e0b' : 'transparent', color: orderType === 'dine-in' ? '#fff' : 'rgba(255,255,255,0.5)'
+                    }}>🍽️ Dine-in</button>
+                    <button onClick={() => setOrderType('takeaway')} style={{
+                        padding: '6px 16px', borderRadius: '99px', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', transition: 'all 0.2s',
+                        background: orderType === 'takeaway' ? '#f59e0b' : 'transparent', color: orderType === 'takeaway' ? '#fff' : 'rgba(255,255,255,0.5)'
+                    }}>🛍️ Takeaway</button>
+                </div>
             </div>
 
             {/* ── Tabs ── */}
@@ -346,14 +408,14 @@ const CustomerDashboard = () => {
                                 <span style={{ fontWeight: 800, fontSize: '20px', color: '#f59e0b' }}>{fmt(cartTotal)}</span>
                             </div>
 
-                            <button onClick={handlePayAndOrder} style={{
+                            <button onClick={handleAction} style={{
                                 ...addBtnStyle,
                                 padding: '16px',
                                 fontSize: '15px',
                                 width: '100%',
                                 borderRadius: '12px',
                             }}>
-                                💳 Pay &amp; Place Order
+                                {isDineIn ? (currentOrder ? '🍽️ Send More to Kitchen' : '🍽️ Send to Kitchen') : '💳 Pay & Place Order'}
                             </button>
                         </>
                     )}
@@ -378,7 +440,8 @@ const CustomerDashboard = () => {
                                 <span style={{ fontSize: '28px' }}>{STATUS_LABELS[currentOrder.status]?.icon}</span>
                                 <div>
                                     <div style={{ fontWeight: 800, fontSize: '16px' }}>
-                                        {STATUS_LABELS[currentOrder.status]?.label || currentOrder.status}
+                                        {STATUS_LABELS[currentOrder.status?.toLowerCase()]?.label || currentOrder.status}
+                                        {currentOrder.kitchenStatus && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#f59e0b', padding: '2px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.1)' }}>{currentOrder.kitchenStatus}</span>}
                                     </div>
                                     <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
                                         {currentOrder.orderNumber}
@@ -406,9 +469,22 @@ const CustomerDashboard = () => {
                                     </div>
                                 ))}
                                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '8px', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#fff' }}>
-                                    <span>Total Paid</span>
-                                    <span style={{ color: '#f59e0b' }}>{fmt(currentOrder.total)}</span>
+                                    <span>Total</span>
+                                    <span style={{ color: '#f59e0b' }}>{fmt(currentOrder.totalAmount || currentOrder.total)}</span>
                                 </div>
+                                {isDineIn && currentOrder.status?.toLowerCase() !== 'paid' && (
+                                    <button
+                                        onClick={() => setPaymentOpen(true)}
+                                        style={{
+                                            marginTop: '12px', width: '100%', padding: '12px', borderRadius: '10px',
+                                            border: 'none', fontWeight: 800, fontSize: '14px', cursor: 'pointer',
+                                            background: currentOrder.kitchenStatus?.toLowerCase() === 'completed' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255,255,255,0.1)',
+                                            color: currentOrder.kitchenStatus?.toLowerCase() === 'completed' ? '#fff' : 'rgba(255,255,255,0.5)',
+                                            transition: 'all 0.2s'
+                                        }}>
+                                        💳 Pay Bill
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -478,15 +554,20 @@ const CustomerDashboard = () => {
 
                         {/* Order summary */}
                         <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
-                            {cart.map((item) => (
+                            {isDineIn && currentOrder && (
+                                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', paddingBottom: '10px', marginBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                    Payment for Order: <b>{currentOrder.orderNumber}</b>
+                                </div>
+                            )}
+                            {!isDineIn && cart.map((item) => (
                                 <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px', color: 'rgba(255,255,255,0.7)' }}>
                                     <span>{item.name} ×{item.quantity}</span>
                                     <span>{fmt(item.price * item.quantity)}</span>
                                 </div>
                             ))}
-                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px' }}>
+                            <div style={{ borderTop: isDineIn ? 'none' : '1px solid rgba(255,255,255,0.1)', marginTop: isDineIn ? '0' : '10px', paddingTop: isDineIn ? '0' : '10px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px' }}>
                                 <span>Total</span>
-                                <span style={{ color: '#f59e0b' }}>{fmt(cartTotal)}</span>
+                                <span style={{ color: '#f59e0b' }}>{fmt(isDineIn && currentOrder ? currentOrder.totalAmount || currentOrder.total : cartTotal)}</span>
                             </div>
                         </div>
 
@@ -536,7 +617,7 @@ const CustomerDashboard = () => {
                                 cursor: paying ? 'not-allowed' : 'pointer',
                             }}
                         >
-                            {paying ? '⏳ Processing…' : `Confirm & Pay ${fmt(cartTotal)}`}
+                            {paying ? '⏳ Processing…' : `Confirm & Pay ${fmt(isDineIn && currentOrder ? currentOrder.totalAmount || currentOrder.total : cartTotal)}`}
                         </button>
                     </div>
                 </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Monitor, ClipboardList, Users, TableProperties, Package, Tags, CreditCard, Ticket, UserSquare2, ChefHat, BarChart3, LogOut, Sun, Moon, Bell, Menu, X, Clock } from 'lucide-react';
+import { LayoutGrid, Monitor, ClipboardList, Users, TableProperties, Package, Tags, CreditCard, Ticket, UserSquare2, ChefHat, BarChart3, LogOut, Sun, Moon, Bell, Menu, X, Clock, History } from 'lucide-react';
 import { usePOSStore } from '../store/posStore';
 import { Button } from '../components/ui/Button';
 export const DashboardLayout = ({ children }) => {
@@ -40,6 +40,7 @@ export const DashboardLayout = ({ children }) => {
         { name: 'POS Order', path: '/pos', icon: LayoutGrid, roles: ['ADMIN', 'EMPLOYEE'] },
         { name: 'Orders', path: '/orders', icon: ClipboardList, roles: ['ADMIN', 'EMPLOYEE'] },
         { name: 'Customers', path: '/customers', icon: Users, roles: ['ADMIN', 'EMPLOYEE'] },
+        { name: 'Session History', path: '/session-history', icon: History, roles: ['ADMIN', 'EMPLOYEE'] },
         { name: 'Tables', path: '/tables', icon: TableProperties, roles: ['ADMIN', 'EMPLOYEE'] },
         { name: 'Products', path: '/products', icon: Package, roles: ['ADMIN'] },
         { name: 'Categories', path: '/categories', icon: Tags, roles: ['ADMIN'] },

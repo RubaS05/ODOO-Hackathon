@@ -27,9 +27,10 @@ public class KitchenService {
      * Returns all active kitchen orders: those not yet PAID or CANCELLED.
      * Status must be PENDING, PREPARING, or READY.
      */
+    @Transactional(readOnly = true)
     public List<OrderDto> getKitchenOrders() {
         List<KitchenStatus> activeStatuses = Arrays.asList(
-            KitchenStatus.TO_COOK, KitchenStatus.PREPARING
+            KitchenStatus.TO_COOK, KitchenStatus.PREPARING, KitchenStatus.COMPLETED
         );
         return orderRepository.findByKitchenStatusInOrderByOrderDateAsc(activeStatuses).stream()
             .filter(o -> o.getStatus() != OrderStatus.PAID && o.getStatus() != OrderStatus.CANCELLED)

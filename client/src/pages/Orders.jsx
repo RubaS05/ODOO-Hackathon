@@ -39,7 +39,7 @@ export const Orders = () => {
             let statusMatches = false;
             if (statusFilter === 'all') statusMatches = true;
             else if (statusFilter === 'draft') statusMatches = o.status === 'DRAFT';
-            else if (statusFilter === 'pending') statusMatches = o.status === 'PENDING';
+            else if (statusFilter === 'pending') statusMatches = o.status === 'PENDING' || o.status === 'READY';
             else if (statusFilter === 'paid') statusMatches = o.status === 'PAID';
             else if (statusFilter === 'cancelled') statusMatches = o.status === 'CANCELLED';
 
@@ -60,17 +60,18 @@ export const Orders = () => {
         }
     };
 
-    const getStatusBadge = (status, kitchenStatus) => {
+    const getPaymentStatusBadge = (status) => {
         if (status === 'PAID') return <Badge variant="success">Paid</Badge>;
         if (status === 'DRAFT') return <Badge variant="secondary">Draft</Badge>;
         if (status === 'CANCELLED') return <Badge variant="destructive">Cancelled</Badge>;
-        
-        if (status === 'PENDING') {
-            if (kitchenStatus === 'COMPLETED') return <Badge variant="info">Delivered - Unpaid</Badge>;
-            if (kitchenStatus === 'PREPARING') return <Badge variant="warning">Cooking</Badge>;
-            return <Badge variant="warning">To Cook</Badge>;
-        }
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="warning">Unpaid</Badge>;
+    };
+
+    const getFoodStatusBadge = (kitchenStatus, status) => {
+        if (status === 'DRAFT' || status === 'CANCELLED') return <Badge variant="secondary">N/A</Badge>;
+        if (kitchenStatus === 'COMPLETED') return <Badge variant="info">Delivered</Badge>;
+        if (kitchenStatus === 'PREPARING') return <Badge variant="warning">Cooking</Badge>;
+        return <Badge variant="secondary">To Cook</Badge>;
     };
 
     return (
@@ -107,7 +108,8 @@ export const Orders = () => {
                         <TableHead>Customer</TableHead>
                         <TableHead>Service</TableHead>
                         <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Payment Status</TableHead>
+                        <TableHead>Food Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -124,13 +126,14 @@ export const Orders = () => {
                                 <TableCell className="text-xs font-semibold">{order.customer?.name || 'Walk-in Guest'}</TableCell>
                                 <TableCell className="text-xs capitalize">{order.orderType}</TableCell>
                                 <TableCell className="font-mono font-bold text-xs">₹{order.totalAmount?.toFixed(2)}</TableCell>
-                                <TableCell>{getStatusBadge(order.status, order.kitchenStatus)}</TableCell>
+                                <TableCell>{getPaymentStatusBadge(order.status)}</TableCell>
+                                <TableCell>{getFoodStatusBadge(order.kitchenStatus, order.status)}</TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-1.5">
                                         <Button variant="outline" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => setSelectedOrder(order)}>
                                             <Eye size={14}/>
                                         </Button>
-                                        {order.status === 'PENDING' && (
+                                        {(order.status === 'PENDING' || order.status === 'READY') && (
                                             <Button variant="secondary" size="icon" className="h-8 w-8 cursor-pointer text-emerald-600 hover:bg-emerald-100" onClick={() => handlePayBill(order.id)} title="Pay Bill">
                                                 <Banknote size={14}/>
                                             </Button>
@@ -141,7 +144,7 @@ export const Orders = () => {
                         ))
                     ) : (
                         <TableRow>
-                            <TableCell colSpan={7} className="text-center py-12 text-muted-foreground text-xs">No orders found.</TableCell>
+                            <TableCell colSpan={8} className="text-center py-12 text-muted-foreground text-xs">No orders found.</TableCell>
                         </TableRow>
                     )}
                 </TableBody>
@@ -169,9 +172,13 @@ export const Orders = () => {
                                 <span className="text-muted-foreground">CUSTOMER:</span>
                                 <span>{selectedOrder.customer?.name || 'Walk-in Guest'}</span>
                             </div>
-                            <div className="flex justify-between text-xxs">
-                                <span className="text-muted-foreground">STATUS:</span>
-                                <span className="font-bold text-primary uppercase">{selectedOrder.status}</span>
+                            <div className="flex justify-between text-xxs items-center">
+                                <span className="text-muted-foreground">PAYMENT:</span>
+                                <span>{getPaymentStatusBadge(selectedOrder.status)}</span>
+                            </div>
+                            <div className="flex justify-between text-xxs items-center">
+                                <span className="text-muted-foreground">FOOD:</span>
+                                <span>{getFoodStatusBadge(selectedOrder.kitchenStatus, selectedOrder.status)}</span>
                             </div>
                         </div>
 
@@ -221,7 +228,7 @@ export const Orders = () => {
                             <Button variant="outline" className="flex-1 font-bold text-xs h-9 cursor-pointer" onClick={() => window.print()}>
                                 Print Receipt
                             </Button>
-                            {selectedOrder.status === 'PENDING' && (
+                            {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'READY') && (
                                 <Button className="flex-1 font-bold text-xs h-9 cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handlePayBill(selectedOrder.id)}>
                                     Pay Bill (₹{selectedOrder.totalAmount?.toFixed(2)})
                                 </Button>

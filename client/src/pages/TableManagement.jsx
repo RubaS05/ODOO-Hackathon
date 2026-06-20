@@ -59,12 +59,16 @@ export const TableManagement = () => {
     const loadTables = async () => {
         try {
             const apiTables = await apiService.tables.getAll();
-            // Map api structure (tableNumber, seats, floor.name) to store structure (number, seats, floor)
-            const mapped = apiTables.map(t => ({
-                ...t,
-                number: t.tableNumber,
-                floor: t.floor?.name || '1st Floor',
-                status: t.active ? 'available' : 'unavailable',
+            const mapped = await Promise.all(apiTables.map(async (t) => {
+                const qrUrl = t.qrCodeUrl || `${window.location.origin}/table/${t.id}`;
+                const dataUrl = await generateQrDataUrl(qrUrl);
+                return {
+                    ...t,
+                    number: t.tableNumber,
+                    floor: t.floor?.name || '1st Floor',
+                    status: t.active ? 'available' : 'unavailable',
+                    qrDataUrl: dataUrl
+                };
             }));
             setTables(mapped);
         } catch (err) {
@@ -111,16 +115,7 @@ export const TableManagement = () => {
         }
     };
 
-    // Ensure all existing tables have a QR code generated
-    useEffect(() => {
-        tables.forEach(async (t) => {
-            if (!t.qrDataUrl) {
-                const qrUrl = t.qrCodeUrl || `${window.location.origin}/table/${t.id}`;
-                const dataUrl = await generateQrDataUrl(qrUrl);
-                setTableQrDataUrl(t.id, dataUrl);
-            }
-        });
-    }, []); // Only on mount
+    // QR codes are now generated during loadTables and handleCreateTable
 
     const handleDeleteTableClick = async (tableId) => {
         if (confirm('Are you sure you want to delete this table?')) {

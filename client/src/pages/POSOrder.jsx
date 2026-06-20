@@ -14,7 +14,7 @@ export const POSOrder = () => {
         cart, activeCustomer, activeTable, activeCoupon, orderType, cartNotes,
         customers, coupons, paymentMethods, addToCart, removeFromCart,
         updateCartQuantity, clearCart, assignCustomer, assignTable, applyCoupon,
-        setOrderType, setCartNotes, getCartTotals
+        setOrderType, setCartNotes, getCartTotals, addCustomer
     } = usePOSStore();
 
     // Local state for API data
@@ -36,12 +36,20 @@ export const POSOrder = () => {
     const [newCustomerName, setNewCustomerName] = useState('');
     const [newCustomerEmail, setNewCustomerEmail] = useState('');
     const [newCustomerPhone, setNewCustomerPhone] = useState('');
+    const [customerSearchQuery, setCustomerSearchQuery] = useState('');
 
     // Payment Method Selection & Inputs
     const [selectedPaymentType, setSelectedPaymentType] = useState('cash');
     const [cashAmountReceived, setCashAmountReceived] = useState('');
     const [cardReference, setCardReference] = useState('');
     const [checkoutSuccess, setCheckoutSuccess] = useState(null);
+
+    // Checkout Details Interceptor
+    const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+    const [checkoutAction, setCheckoutAction] = useState(null);
+    const [checkoutEmail, setCheckoutEmail] = useState('');
+    const [checkoutName, setCheckoutName] = useState('');
+    const [checkoutPhone, setCheckoutPhone] = useState('');
 
     // Fetch initial data
     useEffect(() => {
@@ -105,12 +113,21 @@ export const POSOrder = () => {
             quantity: item.quantity
         }));
 
+        // Sanitize IDs: if they are local mock strings (e.g. 'tab-123'), send null instead
+        const tId = activeTable?.id;
+        const cId = activeCustomer?.id;
+        const sanitizedTableId = typeof tId === 'string' && tId.startsWith('tab-') ? null : tId;
+        const sanitizedCustomerId = typeof cId === 'string' && cId.startsWith('cust-') ? null : cId;
+
         const orderData = {
             sessionId: currentSession.id,
             orderType: orderType,
             notes: cartNotes,
-            tableId: activeTable?.id,
-            customerId: activeCustomer?.id,
+            tableId: sanitizedTableId,
+            customerId: sanitizedCustomerId,
+            customerEmail: checkoutEmail || undefined,
+            customerName: checkoutName || undefined,
+            customerPhone: checkoutPhone || undefined,
             items: items,
             sendToKitchen: isSendToKitchen,
             paymentMethod: paymentMethod
@@ -118,6 +135,20 @@ export const POSOrder = () => {
 
         try {
             const createdOrder = await apiService.orders.create(orderData);
+            
+            // Check if we need to add a new customer to the local store
+            if (checkoutEmail) {
+                const existingCustomer = customers.find(c => c.email === checkoutEmail);
+                if (!existingCustomer) {
+                    addCustomer({
+                        id: createdOrder.customerId || `cust-${Date.now()}`,
+                        name: checkoutName || checkoutEmail.split('@')[0],
+                        email: checkoutEmail,
+                        phoneNumber: checkoutPhone || '',
+                    });
+                }
+            }
+
             clearCart();
             setCheckoutSuccess({
                 ...createdOrder,
@@ -131,14 +162,39 @@ export const POSOrder = () => {
         }
     };
 
-    const handleSendToKitchen = () => {
+    const triggerCheckout = (action) => {
         if (cart.length === 0) return;
-        submitOrderAPI(true, null, false);
+        if (activeCustomer && activeCustomer.email) {
+            submitOrderAPI(action.isSendToKitchen, action.paymentMethod, action.isDraft);
+        } else {
+            setCheckoutAction(action);
+            setCheckoutModalOpen(true);
+        }
+    };
+
+    const handleSendToKitchen = () => {
+        triggerCheckout({ isSendToKitchen: true, paymentMethod: null, isDraft: false });
     };
 
     const handleSendReceipt = () => {
-        if (cart.length === 0) return;
-        submitOrderAPI(false, null, true);
+        triggerCheckout({ isSendToKitchen: false, paymentMethod: null, isDraft: true });
+    };
+
+    const handleConfirmCheckoutDetails = (e) => {
+        e.preventDefault();
+        if (!checkoutEmail) return;
+        setCheckoutModalOpen(false);
+        submitOrderAPI(checkoutAction.isSendToKitchen, checkoutAction.paymentMethod, checkoutAction.isDraft);
+    };
+
+    const handleEmailChange = (e) => {
+        const val = e.target.value;
+        setCheckoutEmail(val);
+        if (val.includes('@')) {
+            const parsedName = val.split('@')[0];
+            // Only auto-fill if the user hasn't explicitly typed a completely different name
+            setCheckoutName(parsedName);
+        }
     };
 
     const handleCheckoutPayment = () => {
@@ -158,7 +214,7 @@ export const POSOrder = () => {
             }
         }
 
-        submitOrderAPI(true, paymentMethod, false);
+        triggerCheckout({ isSendToKitchen: true, paymentMethod: paymentMethod, isDraft: false });
         setCashAmountReceived('');
         setCardReference('');
     };
@@ -169,13 +225,13 @@ export const POSOrder = () => {
 
     const handleAddNewCustomer = async (e) => {
         e.preventDefault();
-        if (!newCustomerName) return;
+        if (!newCustomerName || !newCustomerEmail) return;
         
         try {
             const custData = {
                 name: newCustomerName,
-                email: newCustomerEmail || `${newCustomerName.toLowerCase().replace(/ /g, '')}@example.com`,
-                phoneNumber: newCustomerPhone || '+1 555-0100',
+                email: newCustomerEmail,
+                phoneNumber: newCustomerPhone || '',
             };
             const newCust = { id: `cust-${Date.now()}`, ...custData };
             assignCustomer(newCust);
@@ -429,6 +485,124 @@ export const POSOrder = () => {
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* Assign Customer Modal */}
+            <Modal isOpen={customerModalOpen} onClose={() => { setCustomerModalOpen(false); setCustomerSearchQuery(''); }} title="Assign Customer" size="md">
+                <div className="space-y-6">
+                    {/* Existing Customers List */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-bold text-xs uppercase text-muted-foreground">Select Existing Customer</h4>
+                        </div>
+                        <div className="mb-3 relative">
+                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <Input 
+                                placeholder="Search by name or email..." 
+                                value={customerSearchQuery}
+                                onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                                className="pl-8 h-8 text-xs"
+                            />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-2">
+                            {(() => {
+                                const filteredCustomers = customers.filter(c => 
+                                    (c.name && c.name.toLowerCase().includes(customerSearchQuery.toLowerCase())) || 
+                                    (c.email && c.email.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+                                );
+                                return filteredCustomers.length > 0 ? filteredCustomers.map(cust => (
+                                    <div key={cust.id} 
+                                        onClick={() => { assignCustomer(cust); setCustomerModalOpen(false); setCustomerSearchQuery(''); }}
+                                        className={`p-3 rounded-lg border cursor-pointer transition-all ${activeCustomer?.id === cust.id ? 'bg-primary/10 border-primary' : 'bg-card border-border hover:border-primary/50'}`}>
+                                        <div className="font-bold text-sm">{cust.name}</div>
+                                        <div className="text-xxs text-muted-foreground mt-0.5">{cust.email}</div>
+                                        <div className="text-xxs text-muted-foreground">{cust.phoneNumber || 'No phone'}</div>
+                                    </div>
+                                )) : (
+                                    <p className="text-xs text-muted-foreground col-span-2">No customers match your search.</p>
+                                );
+                            })()}
+                        </div>
+                        {activeCustomer && (
+                            <Button variant="outline" size="sm" className="mt-3 text-xs text-destructive hover:bg-destructive hover:text-white" onClick={() => { assignCustomer(null); setCustomerModalOpen(false); }}>
+                                Remove Selected Customer
+                            </Button>
+                        )}
+                    </div>
+
+                    <hr className="border-border/60" />
+
+                    {/* Create New Customer Form */}
+                    <form onSubmit={handleAddNewCustomer} className="space-y-4">
+                        <h4 className="font-bold text-xs uppercase text-muted-foreground">Or Create New</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <Input
+                                label="Full Name *"
+                                value={newCustomerName}
+                                onChange={(e) => setNewCustomerName(e.target.value)}
+                                required
+                                placeholder="John Doe"
+                            />
+                            <Input
+                                label="Email Address *"
+                                type="email"
+                                value={newCustomerEmail}
+                                onChange={(e) => setNewCustomerEmail(e.target.value)}
+                                required
+                                placeholder="john@example.com"
+                            />
+                            <div className="sm:col-span-2">
+                                <Input
+                                    label="Mobile Number (Optional)"
+                                    value={newCustomerPhone}
+                                    onChange={(e) => setNewCustomerPhone(e.target.value)}
+                                    placeholder="+1 555-0199"
+                                />
+                            </div>
+                        </div>
+                        <Button type="submit" className="w-full font-bold text-xs">
+                            <UserPlus size={14} className="mr-2" />
+                            Create & Assign Customer
+                        </Button>
+                    </form>
+                </div>
+            </Modal>
+
+            {/* Checkout Customer Details Modal */}
+            <Modal isOpen={checkoutModalOpen} onClose={() => setCheckoutModalOpen(false)} title="Customer Email (Required for E-Receipt)">
+                <form onSubmit={handleConfirmCheckoutDetails} className="space-y-4">
+                    <div className="bg-accent/20 border border-border p-3 rounded-md mb-4 text-xs text-muted-foreground">
+                        Please provide an email to send the PDF receipt once the order is paid. We will automatically link or create a profile.
+                    </div>
+                    <Input
+                        label="Email Address (Required)"
+                        type="email"
+                        placeholder="customer@example.com"
+                        value={checkoutEmail}
+                        onChange={handleEmailChange}
+                        required
+                    />
+                    <Input
+                        label="Customer Name"
+                        placeholder="Auto-filled from email..."
+                        value={checkoutName}
+                        onChange={(e) => setCheckoutName(e.target.value)}
+                    />
+                    <Input
+                        label="Mobile Number (Optional)"
+                        placeholder="+1 555-0199"
+                        value={checkoutPhone}
+                        onChange={(e) => setCheckoutPhone(e.target.value)}
+                    />
+                    <div className="flex gap-2 pt-2">
+                        <Button type="button" variant="ghost" onClick={() => setCheckoutModalOpen(false)} className="flex-1 text-xs">
+                            Cancel
+                        </Button>
+                        <Button type="submit" className="flex-1 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90">
+                            Continue to Checkout
+                        </Button>
+                    </div>
+                </form>
             </Modal>
         </div>
     );

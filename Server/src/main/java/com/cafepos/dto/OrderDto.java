@@ -39,8 +39,12 @@ public class OrderDto {
         dto.setOrderType(o.getOrderType());
         dto.setStatus(o.getStatus());
         dto.setKitchenStatus(o.getKitchenStatus());
-        dto.setEmployeeName(o.getEmployee().getName());
-        dto.setSessionId(o.getSession().getId());
+        if (o.getEmployee() != null) {
+            dto.setEmployeeName(o.getEmployee().getName());
+        }
+        if (o.getSession() != null) {
+            dto.setSessionId(o.getSession().getId());
+        }
         dto.setSubtotal(o.getSubtotal());
         dto.setTaxAmount(o.getTaxAmount());
         dto.setDiscountAmount(o.getDiscountAmount());

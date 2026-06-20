@@ -16,7 +16,7 @@ export const KDS = () => {
     const { data: activeOrders = [], refetch } = useQuery({
         queryKey: ['kitchenOrders'],
         queryFn: apiService.kitchen.getOrders,
-        refetchInterval: 5000 // poll every 5s
+        refetchInterval: 2000 // poll every 2s for real-time feel
     });
 
     // Filter orders for KDS
@@ -63,7 +63,7 @@ export const KDS = () => {
         {/* Ticket Header */}
         <div className={`px-4 py-2 border-b flex justify-between items-center text-xs font-semibold ${getTicketHeaderColor(order.orderType)}`}>
           <div>
-            <span className="font-bold font-mono">{order.orderNumber.slice(-7)}</span>
+            <span className="font-bold font-mono">{order.orderNumber}</span>
             {order.tableNumber && (<span className="ml-2 font-black text-foreground bg-background px-1.5 py-0.5 rounded text-xxs border border-border/20">
                 T: {order.tableNumber}
               </span>)}
@@ -92,7 +92,7 @@ export const KDS = () => {
                   <span className="font-black text-sm text-primary font-mono select-none">
                     {item.quantity}x
                   </span>
-                  <p className="font-bold truncate leading-snug">{item.name}</p>
+                  <p className="font-bold truncate leading-snug">{item.productName}</p>
                 </div>
               </div>))}
           </div>

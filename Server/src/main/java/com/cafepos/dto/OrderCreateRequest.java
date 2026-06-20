@@ -9,6 +9,9 @@ public class OrderCreateRequest {
     private Long sessionId;
     private Long tableId;
     private Long customerId;
+    private String customerEmail;
+    private String customerName;
+    private String customerPhone;
     private String orderType;    // dine-in, takeaway, delivery
     private String notes;
     private String couponCode;

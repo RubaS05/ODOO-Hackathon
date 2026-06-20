@@ -11,6 +11,7 @@ import { POSOrder } from '../pages/POSOrder';
 import { TableManagement } from '../pages/TableManagement';
 import { Orders } from '../pages/Orders';
 import { CustomerManagement } from '../pages/CustomerManagement';
+import { SessionHistory } from '../pages/SessionHistory';
 import { ProductManagement } from '../pages/ProductManagement';
 import { CategoryManagement } from '../pages/CategoryManagement';
 import { PaymentMethods } from '../pages/PaymentMethods';
@@ -56,6 +57,7 @@ export const AppRoutes = () => {
                 <Route path="/tables" element={<DashboardLayout><TableManagement /></DashboardLayout>} />
                 <Route path="/orders" element={<DashboardLayout><Orders /></DashboardLayout>} />
                 <Route path="/customers" element={<DashboardLayout><CustomerManagement /></DashboardLayout>} />
+                <Route path="/session-history" element={<DashboardLayout><SessionHistory /></DashboardLayout>} />
             </Route>
 
             {/* Chef & Admin Route */}

@@ -5,6 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import jakarta.mail.internet.MimeMessage;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -34,6 +37,26 @@ public class EmailService {
             log.info("Welcome email sent successfully to {}", toEmail);
         } catch (Exception e) {
             log.error("Failed to send welcome email to {}", toEmail, e);
+        }
+    }
+
+    @Async
+    public void sendReceiptEmail(String toEmail, String customerName, String orderNumber, String htmlReceipt) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject("Your Receipt from Odoo Cafe - " + orderNumber);
+
+            // Send the beautiful HTML receipt directly as the email body
+            helper.setText(htmlReceipt, true);
+
+            mailSender.send(message);
+            log.info("HTML Receipt email sent successfully to {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send receipt email to {}", toEmail, e);
         }
     }
 }

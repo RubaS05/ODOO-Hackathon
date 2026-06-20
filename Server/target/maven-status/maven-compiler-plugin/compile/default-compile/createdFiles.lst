@@ -71,4 +71,5 @@ com\cafepos\repository\CategoryRepository.class
 com\cafepos\service\PaymentMethodService.class
 com\cafepos\dto\ChangePasswordRequest.class
 com\cafepos\service\KitchenService.class
+com\cafepos\service\ReceiptService.class
 com\cafepos\entity\Category.class

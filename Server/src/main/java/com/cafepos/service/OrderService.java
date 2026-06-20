@@ -26,6 +26,8 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final RestaurantTableRepository tableRepository;
     private final CustomerRepository customerRepository;
+    private final ReceiptService receiptService;
+    private final EmailService emailService;
 
     @Transactional
     public OrderDto createOrder(AppUser employee, OrderCreateRequest request) {
@@ -49,9 +51,19 @@ public class OrderService {
             order.setTable(table);
         }
 
-        // Link customer if provided
+        // Link customer if provided by ID
         if (request.getCustomerId() != null) {
             Customer customer = customerRepository.findById(request.getCustomerId()).orElse(null);
+            order.setCustomer(customer);
+        } else if (request.getCustomerEmail() != null && !request.getCustomerEmail().isBlank()) {
+            // Find or create customer by email
+            Customer customer = customerRepository.findByEmail(request.getCustomerEmail()).orElseGet(() -> {
+                Customer newCust = new Customer();
+                newCust.setEmail(request.getCustomerEmail());
+                newCust.setName(request.getCustomerName() != null ? request.getCustomerName() : "Guest");
+                newCust.setPhoneNumber(request.getCustomerPhone());
+                return customerRepository.save(newCust);
+            });
             order.setCustomer(customer);
         }
 
@@ -100,7 +112,15 @@ public class OrderService {
         }
 
         PosOrder saved = orderRepository.save(order);
-        return OrderDto.from(saved);
+        OrderDto dto = OrderDto.from(saved);
+
+        // Send email if paid immediately
+        if (saved.getStatus() == OrderStatus.PAID && saved.getCustomer() != null && saved.getCustomer().getEmail() != null) {
+            String htmlReceipt = receiptService.generateReceiptHtml(dto);
+            emailService.sendReceiptEmail(saved.getCustomer().getEmail(), saved.getCustomer().getName(), saved.getOrderNumber(), htmlReceipt);
+        }
+
+        return dto;
     }
 
     @Transactional
@@ -125,9 +145,19 @@ public class OrderService {
             order.setTable(table);
         }
 
-        // Link customer if provided
+        // Link customer if provided by ID
         if (request.getCustomerId() != null) {
             Customer customer = customerRepository.findById(request.getCustomerId()).orElse(null);
+            order.setCustomer(customer);
+        } else if (request.getCustomerEmail() != null && !request.getCustomerEmail().isBlank()) {
+            // Find or create customer by email
+            Customer customer = customerRepository.findByEmail(request.getCustomerEmail()).orElseGet(() -> {
+                Customer newCust = new Customer();
+                newCust.setEmail(request.getCustomerEmail());
+                newCust.setName(request.getCustomerName() != null ? request.getCustomerName() : "Guest");
+                newCust.setPhoneNumber(request.getCustomerPhone());
+                return customerRepository.save(newCust);
+            });
             order.setCustomer(customer);
         }
 
@@ -218,12 +248,14 @@ public class OrderService {
         return OrderDto.from(saved);
     }
 
+    @Transactional(readOnly = true)
     public List<OrderDto> getAllOrders() {
         return orderRepository.findAllByOrderByOrderDateDesc().stream()
             .map(OrderDto::from)
             .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<OrderDto> getOrdersBySession(Long sessionId) {
         PosSession session = sessionRepository.findById(sessionId)
             .orElseThrow(() -> new RuntimeException("Session not found: " + sessionId));
@@ -232,6 +264,7 @@ public class OrderService {
             .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public OrderDto getOrderById(Long id) {
         return OrderDto.from(orderRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Order not found: " + id)));
@@ -241,7 +274,18 @@ public class OrderService {
     public OrderDto updateOrderStatus(Long id, String status) {
         PosOrder order = orderRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Order not found: " + id));
-        order.setStatus(OrderStatus.valueOf(status.toUpperCase()));
-        return OrderDto.from(orderRepository.save(order));
+        
+        OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
+        order.setStatus(newStatus);
+        
+        PosOrder saved = orderRepository.save(order);
+        OrderDto dto = OrderDto.from(saved);
+
+        if (newStatus == OrderStatus.PAID && saved.getCustomer() != null && saved.getCustomer().getEmail() != null) {
+            String htmlReceipt = receiptService.generateReceiptHtml(dto);
+            emailService.sendReceiptEmail(saved.getCustomer().getEmail(), saved.getCustomer().getName(), saved.getOrderNumber(), htmlReceipt);
+        }
+
+        return dto;
     }
 }

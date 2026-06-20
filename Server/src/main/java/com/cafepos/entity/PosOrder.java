@@ -1,5 +1,6 @@
 package com.cafepos.entity;
 
+import com.cafepos.enums.KitchenStatus;
 import com.cafepos.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -27,35 +28,47 @@ public class PosOrder {
     @Column(nullable = false)
     private LocalDateTime orderDate = LocalDateTime.now();
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(optional = false)
     @JoinColumn(name = "employee_id")
     private AppUser employee;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(optional = false)
     @JoinColumn(name = "session_id")
     private PosSession session;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
+    @JoinColumn(name = "chef_id")
+    private AppUser chef;
+
+    @ManyToOne
     @JoinColumn(name = "table_id")
     private RestaurantTable table;
+
+    // dine-in, takeaway, delivery
+    @Column(nullable = false)
+    private String orderType = "dine-in";
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status = OrderStatus.DRAFT;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private KitchenStatus kitchenStatus = KitchenStatus.TO_COOK;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
     // Order-level discount applied (coupon code or automated order promotion)
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "coupon_id")
     private Coupon coupon;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "promotion_id")
     private Promotion orderPromotion;
 
@@ -70,6 +83,8 @@ public class PosOrder {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    private String notes;
 
     // true if order originated from Self Ordering (Section 2.10) rather than POS terminal
     @Column(nullable = false)

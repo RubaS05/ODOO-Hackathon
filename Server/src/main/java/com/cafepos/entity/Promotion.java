@@ -27,7 +27,7 @@ public class Promotion {
     private PromotionAppliesTo appliesTo; // PRODUCT or ORDER
 
     // Required when appliesTo = PRODUCT
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "product_id")
     private Product product;
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, ClipboardList, Users, TableProperties, Package, Tags, CreditCard, Ticket, UserSquare2, ChefHat, BarChart3, LogOut, Sun, Moon, Bell, Menu, X, Clock } from 'lucide-react';
+import { LayoutGrid, Monitor, ClipboardList, Users, TableProperties, Package, Tags, CreditCard, Ticket, UserSquare2, ChefHat, BarChart3, LogOut, Sun, Moon, Bell, Menu, X, Clock } from 'lucide-react';
 import { usePOSStore } from '../store/posStore';
 import { Button } from '../components/ui/Button';
 export const DashboardLayout = ({ children }) => {
@@ -36,7 +36,8 @@ export const DashboardLayout = ({ children }) => {
         navigate('/login');
     };
     const allMenuItems = [
-        { name: 'POS Order', path: '/', icon: LayoutGrid, roles: ['ADMIN', 'EMPLOYEE'] },
+        { name: 'POS Terminal', path: '/', icon: Monitor, roles: ['ADMIN', 'EMPLOYEE'] },
+        { name: 'POS Order', path: '/pos', icon: LayoutGrid, roles: ['ADMIN', 'EMPLOYEE'] },
         { name: 'Orders', path: '/orders', icon: ClipboardList, roles: ['ADMIN', 'EMPLOYEE'] },
         { name: 'Customers', path: '/customers', icon: Users, roles: ['ADMIN', 'EMPLOYEE'] },
         { name: 'Tables', path: '/tables', icon: TableProperties, roles: ['ADMIN', 'EMPLOYEE'] },
@@ -45,7 +46,7 @@ export const DashboardLayout = ({ children }) => {
         { name: 'Payment Methods', path: '/payment-methods', icon: CreditCard, roles: ['ADMIN'] },
         { name: 'Coupons & Promos', path: '/coupons', icon: Ticket, roles: ['ADMIN'] },
         { name: 'Users / Employees', path: '/users', icon: UserSquare2, roles: ['ADMIN'] },
-        { name: 'Kitchen (KDS)', path: '/kds', icon: ChefHat, roles: ['ADMIN', 'EMPLOYEE'] },
+        { name: 'Kitchen (KDS)', path: '/kitchen', icon: ChefHat, roles: ['ADMIN', 'CHEF'] },
         { name: 'Reports', path: '/reports', icon: BarChart3, roles: ['ADMIN'] },
     ];
     const menuItems = allMenuItems.filter(item => item.roles.includes(currentUser?.role || ''));

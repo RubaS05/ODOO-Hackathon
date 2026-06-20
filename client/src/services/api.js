@@ -1,196 +1,205 @@
 import axios from 'axios';
 import { usePOSStore } from '../store/posStore';
-// We'll update the token when a user logs in
 const apiClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8082/api',
-    headers: {
-        'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
 });
-// Add a request interceptor to attach JWT token
+
+// Attach JWT token to every request
 apiClient.interceptors.request.use((config) => {
     const token = localStorage.getItem('pos_token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
 }, (error) => Promise.reject(error));
-// We add mock delays to simulate actual network conditions
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// On 401, auto-logout
+apiClient.interceptors.response.use(
+    (res) => res,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('pos_token');
+            usePOSStore.getState().logout();
+        }
+        return Promise.reject(error);
+    }
+);
+
 export const apiService = {
+    /* ─── AUTH ──────────────────────────────────────────────── */
     auth: {
-        login: async (usernameOrEmail, password) => {
-            const response = await apiClient.post('/auth/login', {
-                email: usernameOrEmail,
-                password: password,
-            });
-            const userData = response.data;
-            // Save token to localStorage
-            if (userData.token) {
-                localStorage.setItem('pos_token', userData.token);
-            }
-            // Also update the store (this updates global state)
+        login: async (email, password) => {
+            const res = await apiClient.post('/auth/login', { email, password });
+            const userData = res.data;
+            if (userData.token) localStorage.setItem('pos_token', userData.token);
             usePOSStore.getState().setCurrentUser(userData);
             return userData;
         },
-        signup: async (fullName, email, password) => {
-            await apiClient.post('/auth/signup', {
-                name: fullName,
-                email: email,
-                password: password
-            });
+        signup: async (name, email, password) => {
+            await apiClient.post('/auth/signup', { name, email, password });
         },
         logout: async () => {
             localStorage.removeItem('pos_token');
             usePOSStore.getState().logout();
-        }
+        },
+        changePassword: async (oldPassword, newPassword) => {
+            await apiClient.post('/auth/change-password', { oldPassword, newPassword });
+        },
     },
-    products: {
+
+    /* ─── SESSIONS ───────────────────────────────────────────── */
+    sessions: {
+        getCurrent: async () => {
+            const res = await apiClient.get('/sessions/current');
+            return res.data;
+        },
+        open: async (openingCashAmount = 0) => {
+            const res = await apiClient.post('/sessions/open', { openingCashAmount });
+            return res.data;
+        },
+        close: async () => {
+            const res = await apiClient.post('/sessions/close');
+            return res.data;
+        },
         getAll: async () => {
-            await delay(500);
-            return usePOSStore.getState().products;
+            const res = await apiClient.get('/sessions');
+            return res.data;
         },
-        create: async (product) => {
-            await delay(400);
-            usePOSStore.getState().addProduct(product);
-        },
-        update: async (id, updates) => {
-            await delay(400);
-            usePOSStore.getState().updateProduct(id, updates);
-        },
-        delete: async (id) => {
-            await delay(300);
-            usePOSStore.getState().deleteProduct(id);
-        }
     },
-    categories: {
-        getAll: async () => {
-            await delay(300);
-            return usePOSStore.getState().categories;
-        },
-        create: async (category) => {
-            await delay(400);
-            usePOSStore.getState().addCategory(category);
-        },
-        update: async (id, updates) => {
-            await delay(400);
-            usePOSStore.getState().updateCategory(id, updates);
-        },
-        delete: async (id) => {
-            await delay(300);
-            usePOSStore.getState().deleteCategory(id);
-        }
-    },
-    tables: {
-        getAll: async () => {
-            await delay(400);
-            return usePOSStore.getState().tables;
-        },
-        create: async (table) => {
-            await delay(400);
-            usePOSStore.getState().addTable(table);
-        },
-        update: async (id, updates) => {
-            await delay(400);
-            usePOSStore.getState().updateTable(id, updates);
-        },
-        delete: async (id) => {
-            await delay(300);
-            usePOSStore.getState().deleteTable(id);
-        },
-        setStatus: async (id, status, orderId) => {
-            await delay(200);
-            usePOSStore.getState().setTableStatus(id, status, orderId);
-        }
-    },
-    customers: {
-        getAll: async () => {
-            await delay(300);
-            return usePOSStore.getState().customers;
-        },
-        create: async (customer) => {
-            await delay(400);
-            usePOSStore.getState().addCustomer(customer);
-        },
-        update: async (id, updates) => {
-            await delay(400);
-            usePOSStore.getState().updateCustomer(id, updates);
-        },
-        delete: async (id) => {
-            await delay(300);
-            usePOSStore.getState().deleteCustomer(id);
-        }
-    },
+
+    /* ─── ORDERS ─────────────────────────────────────────────── */
     orders: {
-        getAll: async () => {
-            await delay(500);
-            return usePOSStore.getState().orders;
+        create: async (orderData) => {
+            const res = await apiClient.post('/orders', orderData);
+            return res.data;
         },
-        create: async (paymentDetails, isDraft) => {
-            await delay(600);
-            return usePOSStore.getState().createOrder(paymentDetails, isDraft);
+        getAll: async () => {
+            const res = await apiClient.get('/orders');
+            return res.data;
+        },
+        getById: async (id) => {
+            const res = await apiClient.get(`/orders/${id}`);
+            return res.data;
+        },
+        getBySession: async (sessionId) => {
+            const res = await apiClient.get(`/orders/session/${sessionId}`);
+            return res.data;
         },
         updateStatus: async (id, status) => {
-            await delay(400);
-            usePOSStore.getState().updateOrderStatus(id, status);
+            const res = await apiClient.put(`/orders/${id}/status`, { status });
+            return res.data;
         },
-        delete: async (id) => {
-            await delay(300);
-            usePOSStore.getState().deleteOrder(id);
-        }
     },
-    coupons: {
-        getAll: async () => {
-            await delay(300);
-            return usePOSStore.getState().coupons;
+
+    /* ─── KITCHEN ────────────────────────────────────────────── */
+    kitchen: {
+        getOrders: async () => {
+            const res = await apiClient.get('/kitchen/orders');
+            return res.data;
         },
-        create: async (coupon) => {
-            await delay(400);
-            usePOSStore.getState().addCoupon(coupon);
+        updateItemStatus: async (itemId, kitchenStatus) => {
+            const res = await apiClient.put(`/kitchen/items/${itemId}/status`, { kitchenStatus });
+            return res.data;
+        },
+        updateOrderStatus: async (orderId, kitchenStatus) => {
+            const res = await apiClient.put(`/kitchen/orders/${orderId}/status`, { kitchenStatus });
+            return res.data;
+        },
+    },
+
+    /* ─── PRODUCTS ───────────────────────────────────────────── */
+    products: {
+        getAll: async () => {
+            const res = await apiClient.get('/products');
+            return res.data;
+        },
+        create: async (product) => {
+            const res = await apiClient.post('/products', product);
+            return res.data;
         },
         update: async (id, updates) => {
-            await delay(400);
-            usePOSStore.getState().updateCoupon(id, updates);
+            const res = await apiClient.put(`/products/${id}`, updates);
+            return res.data;
         },
         delete: async (id) => {
-            await delay(300);
-            usePOSStore.getState().deleteCoupon(id);
-        }
-    },
-    promotions: {
-        getAll: async () => {
-            await delay(300);
-            return usePOSStore.getState().promotions;
+            await apiClient.delete(`/products/${id}`);
         },
-        create: async (promo) => {
-            await delay(400);
-            usePOSStore.getState().addPromotion(promo);
+        search: async (name) => {
+            const res = await apiClient.get(`/products/search?name=${name}`);
+            return res.data;
+        },
+    },
+
+    /* ─── CATEGORIES ─────────────────────────────────────────── */
+    categories: {
+        getAll: async () => {
+            const res = await apiClient.get('/categories');
+            return res.data;
+        },
+        create: async (category) => {
+            const res = await apiClient.post('/categories', category);
+            return res.data;
         },
         update: async (id, updates) => {
-            await delay(400);
-            usePOSStore.getState().updatePromotion(id, updates);
+            const res = await apiClient.put(`/categories/${id}`, updates);
+            return res.data;
         },
         delete: async (id) => {
-            await delay(300);
-            usePOSStore.getState().deletePromotion(id);
-        }
+            await apiClient.delete(`/categories/${id}`);
+        },
     },
+
+    /* ─── TABLES ─────────────────────────────────────────────── */
+    tables: {
+        getAll: async () => {
+            const res = await apiClient.get('/tables');
+            return res.data;
+        },
+        create: async (table) => {
+            const res = await apiClient.post('/tables', table);
+            return res.data;
+        },
+        update: async (id, updates) => {
+            const res = await apiClient.put(`/tables/${id}`, updates);
+            return res.data;
+        },
+        delete: async (id) => {
+            await apiClient.delete(`/tables/${id}`);
+        },
+    },
+
+    /* ─── USERS ──────────────────────────────────────────────── */
     users: {
         getAll: async () => {
-            await delay(400);
-            return usePOSStore.getState().users;
+            const res = await apiClient.get('/users');
+            return res.data;
         },
         create: async (user) => {
-            await delay(400);
-            usePOSStore.getState().addUser(user);
+            const res = await apiClient.post('/users', user);
+            return res.data;
         },
-        update: async (id, updates) => {
-            await delay(400);
-            usePOSStore.getState().updateUser(id, updates);
+        archive: async (id) => {
+            const res = await apiClient.put(`/users/${id}/archive`);
+            return res.data;
         },
         delete: async (id) => {
-            await delay(300);
-            usePOSStore.getState().deleteUser(id);
-        }
-    }
+            await apiClient.delete(`/users/${id}`);
+        },
+        resetPassword: async (id, newPassword) => {
+            await apiClient.put(`/users/${id}/password`, { newPassword });
+        },
+    },
+
+    /* ─── PAYMENT METHODS ────────────────────────────────────── */
+    paymentMethods: {
+        getAll: async () => {
+            const res = await apiClient.get('/payment-methods');
+            return res.data;
+        },
+        toggle: async (id) => {
+            const res = await apiClient.put(`/payment-methods/${id}/toggle`);
+            return res.data;
+        },
+    },
 };
+
+export default apiClient;

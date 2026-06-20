@@ -1,62 +1,83 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
-import { usePOSStore } from '../store/posStore';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiService } from '../services/api';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+
 const PREMIUM_COLORS = [
-    '#ec4899', // Pink
-    '#f97316', // Orange
-    '#eab308', // Yellow
-    '#a855f7', // Purple
-    '#06b6d4', // Cyan
-    '#10b981', // Emerald
-    '#3b82f6', // Blue
-    '#ef4444', // Red
-    '#6366f1', // Indigo
-    '#14b8a6', // Teal
-    '#84cc16', // Lime
-    '#f43f5e', // Rose
+    '#ec4899', '#f97316', '#eab308', '#a855f7', '#06b6d4', '#10b981',
+    '#3b82f6', '#ef4444', '#6366f1', '#14b8a6', '#84cc16', '#f43f5e',
 ];
+
 export const CategoryManagement = () => {
-    const { categories, addCategory, updateCategory, deleteCategory } = usePOSStore();
+    const queryClient = useQueryClient();
+
+    // Fetch categories from Backend
+    const { data: categories = [], isLoading } = useQuery({
+        queryKey: ['categories'],
+        queryFn: apiService.categories.getAll,
+    });
+
+    // Mutations
+    const createMutation = useMutation({
+        mutationFn: apiService.categories.create,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, updates }) => apiService.categories.update(id, updates),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: apiService.categories.delete,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
+    });
+
     // State
     const [modalOpen, setModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState(null);
+
     // Form States
     const [name, setName] = useState('');
     const [color, setColor] = useState('#3b82f6');
+
     const handleOpenCreate = () => {
         setEditingCategory(null);
         setName('');
         setColor(PREMIUM_COLORS[0]);
         setModalOpen(true);
     };
+
     const handleOpenEdit = (category) => {
         setEditingCategory(category);
         setName(category.name);
         setColor(category.color);
         setModalOpen(true);
     };
+
     const handleDelete = (categoryId) => {
         if (confirm('Are you sure you want to delete this category? All products under this category will also be deleted.')) {
-            deleteCategory(categoryId);
+            deleteMutation.mutate(categoryId);
         }
     };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!name)
-            return;
+        if (!name) return;
+
         if (editingCategory) {
-            updateCategory(editingCategory.id, { name, color });
-        }
-        else {
-            addCategory({ name, color });
+            updateMutation.mutate({ id: editingCategory.id, updates: { name, color, kitchenDisplay: true } });
+        } else {
+            createMutation.mutate({ name, color, kitchenDisplay: true });
         }
         setModalOpen(false);
         setName('');
     };
+
     return (<div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -81,7 +102,11 @@ export const CategoryManagement = () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {categories.length > 0 ? (categories.map((cat) => (<TableRow key={cat.id}>
+          {isLoading ? (
+            <TableRow>
+                <TableCell colSpan={4} className="text-center py-12 text-muted-foreground text-xs">Loading categories...</TableCell>
+            </TableRow>
+          ) : categories.length > 0 ? (categories.map((cat) => (<TableRow key={cat.id}>
                 <TableCell className="font-bold text-xs">{cat.name}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -133,4 +158,5 @@ export const CategoryManagement = () => {
       </Modal>
     </div>);
 };
+
 export default CategoryManagement;

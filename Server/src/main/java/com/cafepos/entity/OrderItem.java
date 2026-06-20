@@ -18,11 +18,11 @@ public class OrderItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(optional = false)
     @JoinColumn(name = "order_id")
     private PosOrder order;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(optional = false)
     @JoinColumn(name = "product_id")
     private Product product;
 
@@ -36,7 +36,7 @@ public class OrderItem {
     private BigDecimal lineTotal;
 
     // product-level promotion discount applied to this line, if any
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "promotion_id")
     private Promotion appliedPromotion;
 

@@ -1,19 +1,51 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Plus, Edit2, Trash2 } from 'lucide-react';
-import { usePOSStore } from '../store/posStore';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiService } from '../services/api';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
+
 export const ProductManagement = () => {
-    const { products, categories, addProduct, updateProduct, deleteProduct } = usePOSStore();
+    const queryClient = useQueryClient();
+
+    // Fetch Products
+    const { data: products = [], isLoading: loadingProducts } = useQuery({
+        queryKey: ['products'],
+        queryFn: apiService.products.getAll,
+    });
+
+    // Fetch Categories
+    const { data: categories = [], isLoading: loadingCategories } = useQuery({
+        queryKey: ['categories'],
+        queryFn: apiService.categories.getAll,
+    });
+
+    // Mutations
+    const createMutation = useMutation({
+        mutationFn: apiService.products.create,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, updates }) => apiService.products.update(id, updates),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: apiService.products.delete,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    });
+
     // State
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
     const [modalOpen, setModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
+
     // Form States
     const [name, setName] = useState('');
     const [categoryId, setCategoryId] = useState('');
@@ -21,15 +53,20 @@ export const ProductManagement = () => {
     const [taxRate, setTaxRate] = useState('');
     const [unit, setUnit] = useState('Pcs');
     const [description, setDescription] = useState('');
+
     // Filter products list
     const filteredProducts = useMemo(() => {
         return products.filter((p) => {
             const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 p.description?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesCategory = selectedCategoryFilter === 'all' ? true : p.categoryId === selectedCategoryFilter;
+            
+            // Note: Backend object has `category.id`, mock might have had `categoryId`
+            const catId = p.category?.id || p.categoryId;
+            const matchesCategory = selectedCategoryFilter === 'all' ? true : catId === selectedCategoryFilter;
             return matchesSearch && matchesCategory;
         });
     }, [products, searchTerm, selectedCategoryFilter]);
+
     const handleOpenCreate = () => {
         setEditingProduct(null);
         setName('');
@@ -40,56 +77,57 @@ export const ProductManagement = () => {
         setDescription('');
         setModalOpen(true);
     };
+
     const handleOpenEdit = (product) => {
         setEditingProduct(product);
         setName(product.name);
-        setCategoryId(product.categoryId);
+        setCategoryId(product.category?.id || product.categoryId);
         setPrice(product.price.toString());
-        setTaxRate(product.taxRate.toString());
-        setUnit(product.unit);
+        setTaxRate((product.taxPercent / 100).toString() || '0.08'); // Backend uses taxPercent (e.g. 5.00)
+        setUnit(product.unitOfMeasure || product.unit || 'Pcs');
         setDescription(product.description || '');
         setModalOpen(true);
     };
+
     const handleDelete = (productId) => {
         if (confirm('Are you sure you want to delete this product?')) {
-            deleteProduct(productId);
+            deleteMutation.mutate(productId);
         }
     };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!name || !categoryId || !price)
-            return;
+        if (!name || !categoryId || !price) return;
+
         const parsedPrice = parseFloat(price);
-        const parsedTax = parseFloat(taxRate) || 0.08;
+        const parsedTaxPercent = (parseFloat(taxRate) || 0.08) * 100; // API expects percentage e.g. 8.0
+
+        const payload = {
+            name,
+            category: { id: categoryId },
+            price: parsedPrice,
+            taxPercent: parsedTaxPercent,
+            unitOfMeasure: unit,
+            description,
+        };
+
         if (editingProduct) {
-            updateProduct(editingProduct.id, {
-                name,
-                categoryId,
-                price: parsedPrice,
-                taxRate: parsedTax,
-                unit,
-                description,
-            });
-        }
-        else {
-            addProduct({
-                name,
-                categoryId,
-                price: parsedPrice,
-                taxRate: parsedTax,
-                unit,
-                description,
-            });
+            updateMutation.mutate({ id: editingProduct.id, updates: payload });
+        } else {
+            createMutation.mutate(payload);
         }
         setModalOpen(false);
     };
+
     const getCategoryName = (catId) => {
         const cat = categories.find((c) => c.id === catId);
         return cat ? cat.name : 'Unassigned';
     };
+
     const getCategoryColor = (catId) => {
         return categories.find((c) => c.id === catId)?.color || '#6b7280';
     };
+
     return (<div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -138,8 +176,13 @@ export const ProductManagement = () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredProducts.length > 0 ? (filteredProducts.map((p) => {
-            const catColor = getCategoryColor(p.categoryId);
+          {loadingProducts || loadingCategories ? (
+            <TableRow>
+                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground text-xs">Loading...</TableCell>
+            </TableRow>
+          ) : filteredProducts.length > 0 ? (filteredProducts.map((p) => {
+            const catId = p.category?.id || p.categoryId;
+            const catColor = getCategoryColor(catId);
             return (<TableRow key={p.id}>
                   <TableCell className="font-bold text-xs">
                     <div>
@@ -150,11 +193,11 @@ export const ProductManagement = () => {
                   <TableCell>
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: catColor }}/>
-                      {getCategoryName(p.categoryId)}
+                      {getCategoryName(catId)}
                     </span>
                   </TableCell>
-                  <TableCell className="font-mono font-bold text-xs">${p.price.toFixed(2)} / {p.unit}</TableCell>
-                  <TableCell className="font-mono text-xs">{(p.taxRate * 100).toFixed(0)}%</TableCell>
+                  <TableCell className="font-mono font-bold text-xs">${p.price.toFixed(2)} / {p.unitOfMeasure || p.unit}</TableCell>
+                  <TableCell className="font-mono text-xs">{((p.taxPercent || (p.taxRate * 100))).toFixed(0)}%</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1.5">
                       <Button variant="outline" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => handleOpenEdit(p)}>
@@ -180,6 +223,7 @@ export const ProductManagement = () => {
           <Input label="Food Item Name" placeholder="e.g. Pepperoni Pizza" value={name} onChange={(e) => setName(e.target.value)} required/>
 
           <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
+            <option value="" disabled>Select a category</option>
             {categories.map((cat) => (<option key={cat.id} value={cat.id}>
                 {cat.name}
               </option>))}
@@ -212,11 +256,12 @@ export const ProductManagement = () => {
             <textarea className="flex min-h-[80px] w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Provide simple ingredients or comments..." value={description} onChange={(e) => setDescription(e.target.value)}/>
           </div>
 
-          <Button type="submit" className="w-full font-bold">
+          <Button type="submit" className="w-full font-bold" disabled={createMutation.isPending || updateMutation.isPending}>
             {editingProduct ? 'Save Menu Item' : 'Add Menu Item'}
           </Button>
         </form>
       </Modal>
     </div>);
 };
+
 export default ProductManagement;

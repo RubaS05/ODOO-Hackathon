@@ -35,6 +35,19 @@ public class SecurityConfig {
                 .cors(cors -> cors.configure(http))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        // Admin-only management endpoints
+                        .requestMatchers("/api/users/**").hasRole("ADMIN")
+                        // Tables managed by admin, but pos needs to read them.
+                        .requestMatchers("/api/tables/**").hasAnyRole("ADMIN", "EMPLOYEE")
+                        // Sessions and orders accessible by admin and employee
+                        .requestMatchers("/api/sessions/**").hasAnyRole("ADMIN", "EMPLOYEE")
+                        .requestMatchers("/api/orders/**").hasAnyRole("ADMIN", "EMPLOYEE")
+                        // Kitchen accessible by admin and chef
+                        .requestMatchers("/api/kitchen/**").hasAnyRole("ADMIN", "CHEF")
+                        // Product/Category/PaymentMethod readable by all
+                        .requestMatchers("/api/products/**").hasAnyRole("ADMIN", "EMPLOYEE", "CHEF")
+                        .requestMatchers("/api/categories/**").hasAnyRole("ADMIN", "EMPLOYEE", "CHEF")
+                        .requestMatchers("/api/payment-methods/**").hasAnyRole("ADMIN", "EMPLOYEE", "CHEF")
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

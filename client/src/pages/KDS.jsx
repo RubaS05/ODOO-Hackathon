@@ -5,33 +5,45 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { useQuery } from '@tanstack/react-query';
+import { apiService } from '../services/api';
 export const KDS = () => {
-    const { orders, updateOrderStatus } = usePOSStore();
     // States
     const [searchTerm, setSearchTerm] = useState('');
     const [orderTypeFilter, setOrderTypeFilter] = useState('all');
-    // Filter orders for KDS (excludes drafts and cancelled)
+
+    // Fetch Kitchen Orders from API
+    const { data: activeOrders = [], refetch } = useQuery({
+        queryKey: ['kitchenOrders'],
+        queryFn: apiService.kitchen.getOrders,
+        refetchInterval: 5000 // poll every 5s
+    });
+
+    // Filter orders for KDS
     const kdsOrders = useMemo(() => {
-        return orders.filter((o) => {
-            if (o.status === 'draft' || o.status === 'cancelled')
-                return false;
+        return activeOrders.filter((o) => {
             const matchesSearch = o.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 o.tableNumber?.includes(searchTerm) ||
                 o.customerName?.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesType = orderTypeFilter === 'all' ? true : o.orderType === orderTypeFilter;
             return matchesSearch && matchesType;
         });
-    }, [orders, searchTerm, orderTypeFilter]);
+    }, [activeOrders, searchTerm, orderTypeFilter]);
+
     // Split orders into KDS columns
-    const toCookOrders = useMemo(() => kdsOrders.filter((o) => o.status === 'pending'), [kdsOrders]);
-    const preparingOrders = useMemo(() => kdsOrders.filter((o) => o.status === 'preparing'), [kdsOrders]);
-    const completedOrders = useMemo(() => kdsOrders.filter((o) => o.status === 'completed'), [kdsOrders]);
-    const handleStartPreparing = (orderId) => {
-        updateOrderStatus(orderId, 'preparing');
+    const toCookOrders = useMemo(() => kdsOrders.filter((o) => o.kitchenStatus === 'TO_COOK'), [kdsOrders]);
+    const preparingOrders = useMemo(() => kdsOrders.filter((o) => o.kitchenStatus === 'PREPARING'), [kdsOrders]);
+    const completedOrders = useMemo(() => kdsOrders.filter((o) => o.kitchenStatus === 'COMPLETED'), [kdsOrders]);
+
+    const handleStartPreparing = async (orderId) => {
+        await apiService.kitchen.updateOrderStatus(orderId, 'PREPARING');
+        refetch();
     };
-    const handleCompletePreparing = (orderId) => {
-        updateOrderStatus(orderId, 'completed');
+    const handleCompletePreparing = async (orderId) => {
+        await apiService.kitchen.updateOrderStatus(orderId, 'COMPLETED');
+        refetch();
     };
+    
     const getTicketHeaderColor = (orderType) => {
         switch (orderType) {
             case 'dine-in':
@@ -44,8 +56,9 @@ export const KDS = () => {
                 return 'bg-accent/40 text-muted-foreground';
         }
     };
+    
     const renderOrderCard = (order, nextAction, actionText, actionIcon) => {
-        const elapsedMinutes = Math.floor((Date.now() - new Date(order.date).getTime()) / 60000);
+        const elapsedMinutes = Math.floor((Date.now() - new Date(order.orderDate).getTime()) / 60000);
         return (<Card key={order.id} className="border-border/60 shadow-sm relative overflow-hidden animate-in fade-in duration-200">
         {/* Ticket Header */}
         <div className={`px-4 py-2 border-b flex justify-between items-center text-xs font-semibold ${getTicketHeaderColor(order.orderType)}`}>
@@ -59,10 +72,17 @@ export const KDS = () => {
         </div>
 
         <CardContent className="p-4 space-y-3.5 text-xs">
-          {/* Elapsed Timer */}
-          <div className="flex items-center gap-1 text-xxs text-muted-foreground">
-            <Clock size={12} className={elapsedMinutes > 15 ? 'text-destructive animate-pulse' : 'text-primary'}/>
-            <span>Placed {elapsedMinutes} mins ago</span>
+          {/* Elapsed Timer & Picked By */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1 text-xxs text-muted-foreground">
+                <Clock size={12} className={elapsedMinutes > 15 ? 'text-destructive animate-pulse' : 'text-primary'}/>
+                <span>Placed {elapsedMinutes} mins ago</span>
+            </div>
+            {order.chefName && (
+                <div className="text-xxs font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                    Picked by: {order.chefName}
+                </div>
+            )}
           </div>
 
           {/* Dish checklist */}
@@ -83,13 +103,14 @@ export const KDS = () => {
             </div>)}
 
           {/* Action Trigger */}
-          <Button onClick={nextAction} className="w-full text-xs font-bold py-2 cursor-pointer h-9" size="sm" variant={order.status === 'completed' ? 'outline' : 'primary'}>
+          <Button onClick={nextAction} className="w-full text-xs font-bold py-2 cursor-pointer h-9" size="sm" variant={order.kitchenStatus === 'COMPLETED' ? 'outline' : 'primary'}>
             {actionIcon}
             <span className="ml-1.5">{actionText}</span>
           </Button>
         </CardContent>
       </Card>);
     };
+
     return (<div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -108,15 +129,14 @@ export const KDS = () => {
           </div>
 
           <div className="flex bg-card p-1 rounded-lg border border-border/60 w-full md:w-auto">
-            {['all', 'dine-in', 'takeaway', 'delivery'].map((type) => (<button key={type} onClick={() => setOrderTypeFilter(type)} className={`flex-1 md:flex-initial px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all cursor-pointer ${orderTypeFilter === type
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'}`}>
+            {['all', 'dine-in', 'takeaway', 'delivery'].map((type) => (
+              <button key={type} onClick={() => setOrderTypeFilter(type)} className={`flex-1 md:flex-initial px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all cursor-pointer ${orderTypeFilter === type ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
                 {type === 'all' ? 'All Channels' : type}
-              </button>))}
+              </button>
+            ))}
           </div>
         </CardContent>
       </Card>
-
       {/* Kanban Board columns */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Column 1: To Cook */}

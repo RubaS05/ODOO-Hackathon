@@ -2,6 +2,9 @@ package com.cafepos.enums;
 
 public enum OrderStatus {
     DRAFT,
-    PAID,
+    PENDING,       // Sent to kitchen, awaiting preparation
+    PREPARING,     // Kitchen started cooking
+    READY,         // Food is ready for serving
+    PAID,          // Payment received, order complete
     CANCELLED
 }

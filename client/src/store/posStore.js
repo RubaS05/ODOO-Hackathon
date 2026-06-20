@@ -1,128 +1,22 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 // Initial Mock Data
-const initialCategories = [
-    { id: 'cat-1', name: 'Burgers', color: '#ec4899' }, // Pink
-    { id: 'cat-2', name: 'Pizza', color: '#f97316' }, // Orange
-    { id: 'cat-3', name: 'Pasta', color: '#eab308' }, // Yellow
-    { id: 'cat-4', name: 'Desserts', color: '#a855f7' }, // Purple
-    { id: 'cat-5', name: 'Drinks', color: '#06b6d4' }, // Cyan
-    { id: 'cat-6', name: 'Sides', color: '#10b981' }, // Emerald
-];
-const initialProducts = [
-    { id: 'prod-1', name: 'Signature Cheeseburger', categoryId: 'cat-1', price: 9.99, taxRate: 0.08, unit: 'Pcs', description: 'Flame-grilled beef patty, cheddar, lettuce, tomato, pickles, and chef sauce.' },
-    { id: 'prod-2', name: 'Spicy Chicken Burger', categoryId: 'cat-1', price: 8.99, taxRate: 0.08, unit: 'Pcs', description: 'Crispy fried spicy chicken breast, slaw, jalapenos, and sriracha mayo.' },
-    { id: 'prod-3', name: 'Pepperoni Supreme Pizza', categoryId: 'cat-2', price: 14.99, taxRate: 0.10, unit: '12"', description: 'Loaded with double pepperoni, mozzarella, and marinara sauce.' },
-    { id: 'prod-4', name: 'Margherita Garden Pizza', categoryId: 'cat-2', price: 12.99, taxRate: 0.10, unit: '12"', description: 'Fresh tomatoes, mozzarella, sweet basil, and extra virgin olive oil.' },
-    { id: 'prod-5', name: 'Creamy Carbonara Pasta', categoryId: 'cat-3', price: 11.99, taxRate: 0.08, unit: 'Portion', description: 'Fettuccine with crispy pancetta, parmesan, egg yolk, and cracked black pepper.' },
-    { id: 'prod-6', name: 'Spaghetti Bolognese', categoryId: 'cat-3', price: 10.99, taxRate: 0.08, unit: 'Portion', description: 'Slow-cooked beef and herb ragu over spaghetti, topped with parmesan.' },
-    { id: 'prod-7', name: 'Chocolate Lava Cake', categoryId: 'cat-4', price: 6.99, taxRate: 0.05, unit: 'Portion', description: 'Warm chocolate cake with a molten fudge core, served with vanilla ice cream.' },
-    { id: 'prod-8', name: 'New York Cheesecake', categoryId: 'cat-4', price: 5.99, taxRate: 0.05, unit: 'Slice', description: 'Rich and creamy cheesecake with a graham cracker crust and strawberry compote.' },
-    { id: 'prod-9', name: 'Craft IPA Beer', categoryId: 'cat-5', price: 6.50, taxRate: 0.15, unit: 'Can', description: 'Locally brewed citrusy IPA with a crisp, hoppy finish.' },
-    { id: 'prod-10', name: 'Fresh Lemonade', categoryId: 'cat-5', price: 3.50, taxRate: 0.05, unit: 'Glass', description: 'Squeezed lemons, fresh mint leaves, cane sugar, and chilled mineral water.' },
-    { id: 'prod-11', name: 'Truffle Fries', categoryId: 'cat-6', price: 5.99, taxRate: 0.08, unit: 'Portion', description: 'Golden French fries tossed in white truffle oil, rosemary, and parmesan.' },
-    { id: 'prod-12', name: 'Mozzarella Sticks', categoryId: 'cat-6', price: 6.49, taxRate: 0.08, unit: 'Pcs', description: 'Crispy breaded mozzarella logs, served with warm marinara dipping sauce.' },
-];
-const initialTables = [
-    // 1st Floor
-    { id: 'tab-1', number: '101', seats: 2, status: 'available', floor: '1st Floor' },
-    { id: 'tab-2', number: '102', seats: 4, status: 'occupied', floor: '1st Floor', currentOrderId: 'ord-101' },
-    { id: 'tab-3', number: '103', seats: 6, status: 'reserved', floor: '1st Floor' },
-    { id: 'tab-4', number: '104', seats: 2, status: 'available', floor: '1st Floor' },
-    // 2nd Floor
-    { id: 'tab-5', number: '201', seats: 8, status: 'available', floor: '2nd Floor' },
-    { id: 'tab-6', number: '202', seats: 4, status: 'occupied', floor: '2nd Floor', currentOrderId: 'ord-102' },
-    { id: 'tab-7', number: '203', seats: 4, status: 'available', floor: '2nd Floor' },
-    // Outdoor
-    { id: 'tab-8', number: '301', seats: 4, status: 'available', floor: 'Outdoor' },
-    { id: 'tab-9', number: '302', seats: 2, status: 'reserved', floor: 'Outdoor' },
-];
-const initialCustomers = [
-    { id: 'cust-1', name: 'Alex Johnson', email: 'alex.j@example.com', phone: '+1 555-0199' },
-    { id: 'cust-2', name: 'Sarah Miller', email: 'sarah.m@example.com', phone: '+1 555-0142' },
-    { id: 'cust-3', name: 'Michael Chen', email: 'm.chen@example.com', phone: '+1 555-0178' },
-    { id: 'cust-4', name: 'Emily Davis', email: 'emily.d@example.com', phone: '+1 555-0155' },
-];
-const initialCoupons = [
-    { id: 'coup-1', code: 'WELCOME10', discountType: 'percentage', value: 10 },
-    { id: 'coup-2', code: 'FLAT20', discountType: 'fixed', value: 20, minAmount: 80 },
-    { id: 'coup-3', code: 'CHEESELOVER', discountType: 'percentage', value: 15 },
-];
-const initialPromotions = [
-    { id: 'promo-1', name: 'Burger Fiesta', type: 'product', minQuantity: 2, discountType: 'percentage', discountValue: 50, productId: 'prod-1' },
-    { id: 'promo-2', name: 'Dine-In Happy Hour', type: 'order', minAmount: 100, discountType: 'fixed', discountValue: 15 },
-];
-const initialUsers = [
-    { id: 'user-1', name: 'John Doe', email: 'admin@pos.com', username: 'admin', role: 'ADMIN', status: 'active' },
-    { id: 'user-2', name: 'Cashier Alice', email: 'alice@pos.com', username: 'alice', role: 'EMPLOYEE', status: 'active' },
-    { id: 'user-3', name: 'Chef Bobby', email: 'chef@pos.com', username: 'chef', role: 'EMPLOYEE', status: 'active' },
-];
-const initialPaymentMethods = [
-    { id: 'pm-1', name: 'Cash Payment', type: 'cash', status: true },
-    { id: 'pm-2', name: 'Credit/Debit Card', type: 'card', status: true },
-    { id: 'pm-3', name: 'UPI (QR Code)', type: 'upi', status: true },
-];
-const initialOrders = [
-    {
-        id: 'ord-101',
-        orderNumber: 'ORD-20260620-001',
-        date: '2026-06-20T11:30:00Z',
-        customerId: 'cust-1',
-        customerName: 'Alex Johnson',
-        tableId: 'tab-2',
-        tableNumber: '102',
-        items: [
-            { id: 'oi-1', productId: 'prod-1', name: 'Signature Cheeseburger', price: 9.99, quantity: 2, taxRate: 0.08, lineTotal: 19.98 },
-            { id: 'oi-2', productId: 'prod-10', name: 'Fresh Lemonade', price: 3.50, quantity: 2, taxRate: 0.05, lineTotal: 7.00 },
-        ],
-        subtotal: 26.98,
-        tax: 1.95,
-        discount: 2.70,
-        total: 26.23,
-        status: 'preparing',
-        orderType: 'dine-in',
-    },
-    {
-        id: 'ord-102',
-        orderNumber: 'ORD-20260620-002',
-        date: '2026-06-20T12:00:00Z',
-        customerId: 'cust-2',
-        customerName: 'Sarah Miller',
-        tableId: 'tab-6',
-        tableNumber: '202',
-        items: [
-            { id: 'oi-3', productId: 'prod-3', name: 'Pepperoni Supreme Pizza', price: 14.99, quantity: 1, taxRate: 0.10, lineTotal: 14.99 },
-            { id: 'oi-4', productId: 'prod-7', name: 'Chocolate Lava Cake', price: 6.99, quantity: 1, taxRate: 0.05, lineTotal: 6.99 },
-        ],
-        subtotal: 21.98,
-        tax: 1.85,
-        discount: 0.00,
-        total: 23.83,
-        status: 'completed',
-        paymentMethod: 'card',
-        paymentDetails: { reference: 'TXN-98230912' },
-        orderType: 'dine-in',
-    },
-    {
-        id: 'ord-103',
-        orderNumber: 'ORD-20260620-003',
-        date: '2026-06-20T12:15:00Z',
-        customerName: 'Guest Customer',
-        items: [
-            { id: 'oi-5', productId: 'prod-2', name: 'Spicy Chicken Burger', price: 8.99, quantity: 1, taxRate: 0.08, lineTotal: 8.99 },
-        ],
-        subtotal: 8.99,
-        tax: 0.72,
-        discount: 0.00,
-        total: 9.71,
-        status: 'draft',
-        orderType: 'takeaway',
-    }
-];
+const initialCategories = [];
+const initialProducts = [];
+const initialTables = [];
+const initialCustomers = [];
+const initialCoupons = [];
+const initialPromotions = [];
+const initialUsers = [];
+const initialPaymentMethods = [];
+const initialOrders = [];
 export const usePOSStore = create()(persist((set, get) => ({
     // Authentication
     currentUser: null,
     isAuthenticated: false,
+    // POS Session
+    posSession: null,           // { openedAt, openedBy, openingBalance }
+    lastSession: null,          // { closedAt, closingAmount, totalOrders, openedAt }
     // POS Cart state
     cart: [],
     activeCustomer: null,
@@ -141,7 +35,7 @@ export const usePOSStore = create()(persist((set, get) => ({
     promotions: initialPromotions,
     users: initialUsers,
     // UI
-    darkMode: true, // Default to a gorgeous dark theme
+    darkMode: false, // Default to a gorgeous light theme
     // Auth Functions
     setCurrentUser: (user) => {
         set({ currentUser: user, isAuthenticated: !!user });
@@ -158,7 +52,37 @@ export const usePOSStore = create()(persist((set, get) => ({
     },
     logout: () => {
         localStorage.removeItem('pos_token');
-        set({ currentUser: null, isAuthenticated: false, cart: [], activeCustomer: null, activeTable: null, activeCoupon: null });
+        set({ currentUser: null, isAuthenticated: false, cart: [], activeCustomer: null, activeTable: null, activeCoupon: null, posSession: null });
+    },
+    // POS Session actions
+    openSession: (openingBalance = 0) => {
+        const { currentUser } = get();
+        set({
+            posSession: {
+                openedAt: new Date().toISOString(),
+                openedBy: currentUser?.name || 'Unknown',
+                openingBalance,
+            }
+        });
+    },
+    closeSession: () => {
+        const { posSession, orders } = get();
+        if (!posSession) return;
+        // Calculate session sales total from orders created after session open
+        const sessionOpenTime = new Date(posSession.openedAt).getTime();
+        const sessionOrders = orders.filter(o =>
+            o.status === 'completed' && new Date(o.date).getTime() >= sessionOpenTime
+        );
+        const closingAmount = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+        const lastSession = {
+            openedAt: posSession.openedAt,
+            openedBy: posSession.openedBy,
+            closedAt: new Date().toISOString(),
+            closingAmount: parseFloat(closingAmount.toFixed(2)),
+            totalOrders: sessionOrders.length,
+        };
+        set({ posSession: null, lastSession });
+        return lastSession;
     },
     // Cart management
     addToCart: (product) => {
@@ -437,5 +361,8 @@ export const usePOSStore = create()(persist((set, get) => ({
         darkMode: state.darkMode,
         currentUser: state.currentUser,
         isAuthenticated: state.isAuthenticated,
+        lastSession: state.lastSession,
+        posSession: state.posSession,
     }),
+    version: 1,
 }));

@@ -29,11 +29,18 @@ export const Login = () => {
         setLoading(true);
         setErrorMsg(null);
         try {
-            await apiService.auth.login(data.emailOrUsername, data.password);
-            navigate('/');
+            const res = await apiService.auth.login(data.emailOrUsername, data.password);
+            // res contains the user info, including role
+            if (res.role === 'ADMIN') {
+                navigate('/admin');
+            } else if (res.role === 'CHEF') {
+                navigate('/kitchen');
+            } else {
+                navigate('/pos');
+            }
         }
         catch (err) {
-            setErrorMsg(err.message || 'Authentication failed. Try admin / admin');
+            setErrorMsg(err.message || 'Authentication failed.');
         }
         finally {
             setLoading(false);

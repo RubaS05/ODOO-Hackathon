@@ -181,10 +181,15 @@ export const usePOSStore = create()(persist((set, get) => ({
     deleteProduct: (id) => set((state) => ({
         products: state.products.filter((p) => p.id !== id),
     })),
-    // Tables
-    addTable: (tab) => set((state) => ({
-        tables: [...state.tables, { ...tab, id: `tab-${Date.now()}`, status: 'available' }],
+    setTableQrDataUrl: (id, dataUrl) => set((state) => ({
+        tables: state.tables.map((t) => (t.id === id ? { ...t, qrDataUrl: dataUrl } : t)),
     })),
+    setTables: (tables) => set({ tables }),
+    addTable: (table) => set((state) => {
+        return {
+            tables: [...state.tables, table]
+        };
+    }),
     updateTable: (id, updates) => set((state) => ({
         tables: state.tables.map((t) => (t.id === id ? { ...t, ...updates } : t)),
     })),
@@ -194,6 +199,27 @@ export const usePOSStore = create()(persist((set, get) => ({
     setTableStatus: (id, status, currentOrderId) => set((state) => ({
         tables: state.tables.map((t) => (t.id === id ? { ...t, status, currentOrderId } : t)),
     })),
+    addOrder: (order) => set((state) => ({
+        orders: [order, ...state.orders]
+    })),
+    updateOrder: (id, updates) => set((state) => ({
+        orders: state.orders.map((o) => (o.id === id ? { ...o, ...updates } : o))
+    })),
+    // Customer self-ordering (no POS session required)
+    createCustomerOrder: (orderDto) => {
+        // Map DTO back to frontend format if needed, but since it's from API, we can just save it.
+        const newOrder = {
+            ...orderDto,
+            status: orderDto.status?.toLowerCase() || 'pending',
+            kitchenStatus: orderDto.kitchenStatus?.toLowerCase() || 'received',
+            source: 'customer',
+        };
+        set((state) => ({ orders: [newOrder, ...state.orders] }));
+        if (orderDto.table?.id || orderDto.tableId) {
+            get().setTableStatus(orderDto.table?.id || orderDto.tableId, 'occupied', newOrder.id);
+        }
+        return newOrder;
+    },
     // Customers
     addCustomer: (cust) => set((state) => ({
         customers: [...state.customers, { ...cust, id: `cust-${Date.now()}` }],

@@ -76,12 +76,16 @@ export const apiService = {
             const res = await apiClient.get('/orders');
             return res.data;
         },
-        getById: async (id) => {
-            const res = await apiClient.get(`/orders/${id}`);
+        getByTable: async (tableId) => {
+            const res = await apiClient.get(`/orders/table/${tableId}`);
             return res.data;
         },
         getBySession: async (sessionId) => {
             const res = await apiClient.get(`/orders/session/${sessionId}`);
+            return res.data;
+        },
+        getById: async (id) => {
+            const res = await apiClient.get(`/orders/${id}`);
             return res.data;
         },
         updateStatus: async (id, status) => {
@@ -197,6 +201,34 @@ export const apiService = {
         },
         toggle: async (id) => {
             const res = await apiClient.put(`/payment-methods/${id}/toggle`);
+            return res.data;
+        },
+    },
+
+    /* ─── PUBLIC (CUSTOMER) ──────────────────────────────────── */
+    public: {
+        getProducts: async () => {
+            const res = await apiClient.get('/public/products');
+            return res.data;
+        },
+        getCategories: async () => {
+            const res = await apiClient.get('/public/categories');
+            return res.data;
+        },
+        createOrder: async (orderData) => {
+            const res = await apiClient.post('/public/orders', orderData);
+            return res.data;
+        },
+        getOrder: async (id) => {
+            const res = await apiClient.get(`/public/orders/${id}`);
+            return res.data;
+        },
+        appendItems: async (id, items) => {
+            const res = await apiClient.put(`/public/orders/${id}/append`, { items });
+            return res.data;
+        },
+        payOrder: async (id) => {
+            const res = await apiClient.put(`/public/orders/${id}/pay`);
             return res.data;
         },
     },

@@ -46,6 +46,7 @@ com\cafepos\repository\PosOrderRepository.class
 com\cafepos\controller\CategoryController.class
 com\cafepos\dto\AdminResetPasswordRequest.class
 com\cafepos\entity\PosSession.class
+com\cafepos\controller\PublicController.class
 com\cafepos\entity\PaymentMethod.class
 com\cafepos\entity\Product.class
 com\cafepos\enums\PromotionAppliesTo.class

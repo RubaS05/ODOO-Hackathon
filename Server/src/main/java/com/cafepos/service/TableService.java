@@ -34,8 +34,12 @@ public class TableService {
 
     @Transactional
     public TableDto createTable(TableRequest request) {
-        Floor floor = floorRepository.findById(request.getFloorId())
-            .orElseThrow(() -> new RuntimeException("Floor not found: " + request.getFloorId()));
+        Floor floor = floorRepository.findByName(request.getFloorName())
+            .orElseGet(() -> {
+                Floor newFloor = new Floor();
+                newFloor.setName(request.getFloorName());
+                return floorRepository.save(newFloor);
+            });
         RestaurantTable table = new RestaurantTable();
         table.setFloor(floor);
         table.setTableNumber(request.getTableNumber());
@@ -50,9 +54,13 @@ public class TableService {
             .orElseThrow(() -> new RuntimeException("Table not found: " + id));
         if (request.getTableNumber() != null) table.setTableNumber(request.getTableNumber());
         if (request.getSeats() != null) table.setSeats(request.getSeats());
-        if (request.getFloorId() != null) {
-            Floor floor = floorRepository.findById(request.getFloorId())
-                .orElseThrow(() -> new RuntimeException("Floor not found"));
+        if (request.getFloorName() != null && !request.getFloorName().isBlank()) {
+            Floor floor = floorRepository.findByName(request.getFloorName())
+                .orElseGet(() -> {
+                    Floor newFloor = new Floor();
+                    newFloor.setName(request.getFloorName());
+                    return floorRepository.save(newFloor);
+                });
             table.setFloor(floor);
         }
         return TableDto.from(tableRepository.save(table));

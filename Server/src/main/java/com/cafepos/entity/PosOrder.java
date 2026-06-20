@@ -32,11 +32,11 @@ public class PosOrder {
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = true)
     @JoinColumn(name = "employee_id")
     private AppUser employee;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = true)
     @JoinColumn(name = "session_id")
     private PosSession session;
 
@@ -53,11 +53,11 @@ public class PosOrder {
     private String orderType = "dine-in";
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "order_status", nullable = false, columnDefinition = "VARCHAR(50)")
     private OrderStatus status = OrderStatus.DRAFT;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "kitchen_order_status", nullable = false, columnDefinition = "VARCHAR(50)")
     private KitchenStatus kitchenStatus = KitchenStatus.TO_COOK;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)

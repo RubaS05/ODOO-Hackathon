@@ -6,5 +6,5 @@ import lombok.Data;
 public class TableRequest {
     private String tableNumber;
     private Integer seats;
-    private Long floorId;
+    private String floorName;
 }

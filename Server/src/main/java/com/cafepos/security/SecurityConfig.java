@@ -35,6 +35,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configure(http))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
                         // Admin-only management endpoints
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         // Tables managed by admin, but pos needs to read them.

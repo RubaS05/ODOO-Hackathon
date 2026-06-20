@@ -14,6 +14,8 @@ public interface PosOrderRepository extends JpaRepository<PosOrder, Long> {
     List<PosOrder> findByStatusNotOrderByOrderDateDesc(OrderStatus status);
     List<PosOrder> findAllByOrderByOrderDateDesc();
 
+    List<PosOrder> findByTableIdOrderByOrderDateDesc(Long tableId);
+
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM PosOrder o WHERE o.session = :session AND o.status = 'PAID'")
     java.math.BigDecimal sumTotalBySession(PosSession session);
 }

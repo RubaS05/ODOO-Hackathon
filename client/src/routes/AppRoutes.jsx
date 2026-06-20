@@ -20,6 +20,8 @@ import { KDS } from '../pages/KDS';
 import { Reports } from '../pages/Reports';
 import { CustomerDisplay } from '../pages/CustomerDisplay';
 import { AdminDashboard } from '../pages/AdminDashboard';
+import TableEntry from '../pages/TableEntry';
+import CustomerDashboard from '../pages/CustomerDashboard';
 import { usePOSStore } from '../store/posStore';
 
 // Dynamic Root Redirect Component
@@ -42,6 +44,10 @@ export const AppRoutes = () => {
 
             {/* Separate Public Customer Display Screen Route */}
             <Route path="/customer-display" element={<CustomerDisplay />} />
+
+            {/* Public QR Table Routes – no auth required */}
+            <Route path="/table/:tableId" element={<TableEntry />} />
+            <Route path="/table/:tableId/order" element={<CustomerDashboard />} />
 
             {/* Protected POS Dashboard Routes (Admin & Employee only) */}
             <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'EMPLOYEE']} />}>

@@ -1,10 +1,14 @@
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\config\WebSocketConfig.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\AuthController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\CategoryController.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\CouponController.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\CustomerController.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\FloorController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\KitchenController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\OrderController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\PaymentMethodController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\ProductController.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\PromotionController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\PublicController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\SessionController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\TableController.java
@@ -13,6 +17,7 @@ D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\AdminResetPasswordReq
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\AuthResponse.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\ChangePasswordRequest.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\CreateUserRequest.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\CustomerDto.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\LoginRequest.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\OrderCreateRequest.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\dto\OrderDto.java
@@ -50,6 +55,7 @@ D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\enums\SessionStatus.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\OdooCafePosApplication.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\AppUserRepository.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\CategoryRepository.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\CouponRepository.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\CustomerRepository.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\FloorRepository.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\OrderItemRepository.java
@@ -57,6 +63,7 @@ D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\PaymentMethodR
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\PosOrderRepository.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\PosSessionRepository.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\ProductRepository.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\PromotionRepository.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\repository\RestaurantTableRepository.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\security\CustomUserDetails.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\security\CustomUserDetailsService.java
@@ -74,3 +81,4 @@ D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\SessionService.ja
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\TableService.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\UserService.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\websocket\KdsWebSocketHandler.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\websocket\TableWebSocketHandler.java

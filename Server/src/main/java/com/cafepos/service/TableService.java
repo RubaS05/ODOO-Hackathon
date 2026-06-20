@@ -6,6 +6,7 @@ import com.cafepos.entity.Floor;
 import com.cafepos.entity.RestaurantTable;
 import com.cafepos.repository.FloorRepository;
 import com.cafepos.repository.RestaurantTableRepository;
+import com.cafepos.websocket.TableWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ public class TableService {
 
     private final RestaurantTableRepository tableRepository;
     private final FloorRepository floorRepository;
+    private final TableWebSocketHandler tableWebSocketHandler;
 
     public List<TableDto> getAllActiveTables() {
         return tableRepository.findByActiveTrue().stream()
@@ -30,6 +32,12 @@ public class TableService {
         return tableRepository.findAll().stream()
             .map(TableDto::from)
             .collect(Collectors.toList());
+    }
+
+    public TableDto getTableById(Long id) {
+        RestaurantTable table = tableRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Table not found: " + id));
+        return TableDto.from(table);
     }
 
     @Transactional
@@ -45,7 +53,9 @@ public class TableService {
         table.setTableNumber(request.getTableNumber());
         table.setSeats(request.getSeats());
         table.setActive(true);
-        return TableDto.from(tableRepository.save(table));
+        TableDto dto = TableDto.from(tableRepository.save(table));
+        tableWebSocketHandler.broadcastUpdate(dto);
+        return dto;
     }
 
     @Transactional
@@ -63,7 +73,16 @@ public class TableService {
                 });
             table.setFloor(floor);
         }
-        return TableDto.from(tableRepository.save(table));
+        if (request.getStatus() != null) table.setStatus(request.getStatus());
+        if (request.getOccupiedMembers() != null) {
+            table.setOccupiedMembers(request.getOccupiedMembers());
+        } else if ("AVAILABLE".equals(request.getStatus())) {
+            table.setOccupiedMembers(0); // auto-reset
+        }
+
+        TableDto dto = TableDto.from(tableRepository.save(table));
+        tableWebSocketHandler.broadcastUpdate(dto);
+        return dto;
     }
 
     @Transactional
@@ -72,5 +91,8 @@ public class TableService {
             .orElseThrow(() -> new RuntimeException("Table not found: " + id));
         table.setActive(false);
         tableRepository.save(table);
+        
+        // Broadcast delete action
+        tableWebSocketHandler.broadcastUpdate(java.util.Map.of("deletedTableId", id));
     }
 }

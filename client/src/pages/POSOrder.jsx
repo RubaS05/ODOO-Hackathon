@@ -44,6 +44,7 @@ export const POSOrder = () => {
     const [cashAmountReceived, setCashAmountReceived] = useState('');
     const [cardReference, setCardReference] = useState('');
     const [checkoutSuccess, setCheckoutSuccess] = useState(null);
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
 
     // Checkout Details Interceptor
     const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
@@ -170,27 +171,53 @@ export const POSOrder = () => {
 
     const triggerCheckout = (action) => {
         if (cart.length === 0) return;
-        if (activeCustomer && activeCustomer.email) {
-            submitOrderAPI(action.isSendToKitchen, action.paymentMethod, action.isDraft);
-        } else {
-            setCheckoutAction(action);
-            setCheckoutModalOpen(true);
+        setCheckoutAction(action);
+        
+        // Auto-fill email if we have an active customer
+        if (activeCustomer && activeCustomer.email && !checkoutEmail) {
+            setCheckoutEmail(activeCustomer.email);
+            setCheckoutName(activeCustomer.name || '');
+            setCheckoutPhone(activeCustomer.phoneNumber || '');
         }
+        
+        setCheckoutModalOpen(true);
     };
 
     const handleSendToKitchen = () => {
-        triggerCheckout({ isSendToKitchen: true, paymentMethod: null, isDraft: false });
+        triggerCheckout({ isSendToKitchen: true, isDraft: false });
     };
 
     const handleSendReceipt = () => {
-        triggerCheckout({ isSendToKitchen: false, paymentMethod: null, isDraft: true });
+        triggerCheckout({ isSendToKitchen: false, isDraft: true });
     };
 
-    const handleConfirmCheckoutDetails = (e) => {
-        e.preventDefault();
-        if (!checkoutEmail) return;
+    const handleCheckoutPayment = () => {
+        if (cart.length === 0) return;
+        
+        // If it's a Draft order, we might not require strict payment validation,
+        // but since we are in the payment modal, we validate anyway unless it's draft.
+        const isDraft = checkoutAction?.isDraft || false;
+        let paymentMethod = isDraft ? null : selectedPaymentType;
+        
+        if (!isDraft && selectedPaymentType === 'cash') {
+            const received = parseFloat(cashAmountReceived) || total;
+            if (received < total) {
+                alert('Received cash is less than order total.');
+                return;
+            }
+        } else if (!isDraft && selectedPaymentType === 'card') {
+            if (!cardReference.trim()) {
+                alert('Please enter a card transaction reference.');
+                return;
+            }
+        }
+
+        // Email is required by the HTML5 form, so we just proceed
         setCheckoutModalOpen(false);
-        submitOrderAPI(checkoutAction.isSendToKitchen, checkoutAction.paymentMethod, checkoutAction.isDraft);
+        submitOrderAPI(checkoutAction?.isSendToKitchen ?? true, paymentMethod, isDraft);
+        
+        setCashAmountReceived('');
+        setCardReference('');
     };
 
     const handleEmailChange = (e) => {
@@ -201,28 +228,6 @@ export const POSOrder = () => {
             // Only auto-fill if the user hasn't explicitly typed a completely different name
             setCheckoutName(parsedName);
         }
-    };
-
-    const handleCheckoutPayment = () => {
-        if (cart.length === 0) return;
-
-        let paymentMethod = selectedPaymentType;
-        if (selectedPaymentType === 'cash') {
-            const received = parseFloat(cashAmountReceived) || total;
-            if (received < total) {
-                alert('Received cash is less than order total.');
-                return;
-            }
-        } else if (selectedPaymentType === 'card') {
-            if (!cardReference.trim()) {
-                alert('Please enter a card transaction reference.');
-                return;
-            }
-        }
-
-        triggerCheckout({ isSendToKitchen: true, paymentMethod: paymentMethod, isDraft: false });
-        setCashAmountReceived('');
-        setCardReference('');
     };
 
     const handleQuickCash = (amount) => {
@@ -426,14 +431,18 @@ export const POSOrder = () => {
                             </div>
                         </div>
 
-                        <div className="p-4 border-t border-border grid grid-cols-2 gap-2 bg-card/60">
-                            <Button variant="outline" size="sm" onClick={handleSendReceipt} disabled={cart.length === 0} className="text-xs cursor-pointer">
-                                <Receipt size={14} className="mr-1.5" />
-                                Draft Order
+                        <div className="p-4 border-t border-border grid grid-cols-3 gap-2 bg-card/60">
+                            <Button variant="outline" size="sm" onClick={() => triggerCheckout({ isDraft: true, isSendToKitchen: false })} disabled={cart.length === 0} className="text-xs cursor-pointer px-1">
+                                <Receipt size={14} className="mr-1" />
+                                Draft
                             </Button>
-                            <Button variant="secondary" size="sm" onClick={handleSendToKitchen} disabled={cart.length === 0} className="text-xs cursor-pointer hover:bg-emerald-500 hover:text-white">
-                                <ChefHat size={14} className="mr-1.5" />
-                                Send To Kitchen
+                            <Button variant="secondary" size="sm" onClick={() => triggerCheckout({ isDraft: true, isSendToKitchen: true })} disabled={cart.length === 0} className="text-xs cursor-pointer px-1">
+                                <ChefHat size={14} className="mr-1" />
+                                Kitchen
+                            </Button>
+                            <Button variant="default" size="sm" onClick={() => triggerCheckout({ isSendToKitchen: true, isDraft: false })} disabled={cart.length === 0} className="text-xs cursor-pointer hover:bg-emerald-500 hover:text-white px-1">
+                                <CreditCard size={14} className="mr-1" />
+                                Pay
                             </Button>
                         </div>
                     </Card>
@@ -574,41 +583,187 @@ export const POSOrder = () => {
                 </div>
             </Modal>
 
-            {/* Checkout Customer Details Modal */}
-            <Modal isOpen={checkoutModalOpen} onClose={() => setCheckoutModalOpen(false)} title="Customer Email (Required for E-Receipt)">
-                <form onSubmit={handleConfirmCheckoutDetails} className="space-y-4">
-                    <div className="bg-accent/20 border border-border p-3 rounded-md mb-4 text-xs text-muted-foreground">
-                        Please provide an email to send the PDF receipt once the order is paid. We will automatically link or create a profile.
+              {/* Unified Checkout & Payment Modal */}
+            <Modal isOpen={checkoutModalOpen} onClose={() => setCheckoutModalOpen(false)} title="Checkout & Payment" size="md">
+                <form onSubmit={(e) => { e.preventDefault(); handleCheckoutPayment(); }} className="space-y-5">
+                    
+                    {/* Payment Method Selection - Only show if we are actually checking out */}
+                    {!checkoutAction?.isDraft && (
+                        <div>
+                            <h4 className="font-bold text-xs uppercase text-muted-foreground mb-2">1. Select Payment Method</h4>
+                        <div className="grid grid-cols-3 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedPaymentType('cash')}
+                                className={`py-3 px-2 rounded-md text-sm font-bold border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${selectedPaymentType === 'cash' ? 'bg-primary/10 border-primary text-primary shadow-sm' : 'bg-background border-border text-muted-foreground hover:border-primary/50'}`}
+                            >
+                                <DollarSign size={20} /> Cash
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedPaymentType('card')}
+                                className={`py-3 px-2 rounded-md text-sm font-bold border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${selectedPaymentType === 'card' ? 'bg-primary/10 border-primary text-primary shadow-sm' : 'bg-background border-border text-muted-foreground hover:border-primary/50'}`}
+                            >
+                                <CreditCard size={20} /> Card
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedPaymentType('qr')}
+                                className={`py-3 px-2 rounded-md text-sm font-bold border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${selectedPaymentType === 'qr' ? 'bg-primary/10 border-primary text-primary shadow-sm' : 'bg-background border-border text-muted-foreground hover:border-primary/50'}`}
+                            >
+                                <QrCode size={20} /> QR Pay
+                            </button>
+                        </div>
+                        </div>
+                    )}
+
+                    {/* Payment specifics based on selected type */}
+                    {!checkoutAction?.isDraft && (
+                        <div className="bg-card/50 p-4 rounded-lg border border-border">
+                            {selectedPaymentType === 'cash' && (
+                            <div className="space-y-3">
+                                <label className="text-xs font-semibold">Cash Amount Received</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">₹</span>
+                                    <Input
+                                        type="number"
+                                        placeholder="Amount Received"
+                                        value={cashAmountReceived}
+                                        onChange={(e) => setCashAmountReceived(e.target.value)}
+                                        className="pl-8 font-mono text-base"
+                                        required
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    {[total, 500, 1000, 2000].map((amt, idx) => (
+                                        <button type="button" key={idx} onClick={() => handleQuickCash(amt)} className="flex-1 py-1.5 bg-accent hover:bg-accent/80 rounded border border-border text-xs font-mono font-bold transition-colors cursor-pointer">
+                                            ₹{Math.ceil(amt)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedPaymentType === 'card' && (
+                            <div className="space-y-3">
+                                <label className="text-xs font-semibold">Card Transaction Reference</label>
+                                <Input
+                                    placeholder="Enter Last 4 digits or Auth Code"
+                                    value={cardReference}
+                                    onChange={(e) => setCardReference(e.target.value)}
+                                    className="font-mono text-sm"
+                                    required
+                                />
+                            </div>
+                        )}
+
+                        {selectedPaymentType === 'qr' && (
+                            <div className="flex flex-col items-center justify-center">
+                                <div className="bg-white p-3 rounded-xl shadow-sm border border-border/50 mb-3">
+                                    <img 
+                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=merchant@upi&pn=CafePOS&am=${total.toFixed(2)}&cu=INR`)}`} 
+                                        alt="Payment QR Code"
+                                        className="w-40 h-40"
+                                    />
+                                </div>
+                                <p className="text-sm font-bold text-foreground">Scan to Pay ₹{total.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground mt-1 text-center">Ask customer to scan using any UPI App</p>
+                            </div>
+                        )}
                     </div>
-                    <Input
-                        label="Email Address (Required)"
-                        type="email"
-                        placeholder="customer@example.com"
-                        value={checkoutEmail}
-                        onChange={handleEmailChange}
-                        required
-                    />
-                    <Input
-                        label="Customer Name"
-                        placeholder="Auto-filled from email..."
-                        value={checkoutName}
-                        onChange={(e) => setCheckoutName(e.target.value)}
-                    />
-                    <Input
-                        label="Mobile Number (Optional)"
-                        placeholder="+1 555-0199"
-                        value={checkoutPhone}
-                        onChange={(e) => setCheckoutPhone(e.target.value)}
-                    />
-                    <div className="flex gap-2 pt-2">
-                        <Button type="button" variant="ghost" onClick={() => setCheckoutModalOpen(false)} className="flex-1 text-xs">
+                    )}
+
+                    {/* Customer Email Section */}
+                    <div>
+                        <h4 className="font-bold text-xs uppercase text-muted-foreground mb-2">
+                            {checkoutAction?.isDraft ? '1. Customer Details (Required for Draft/Kitchen)' : '2. E-Receipt Details (Required)'}
+                        </h4>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs text-muted-foreground block mb-1">Customer Email <span className="text-red-500">*</span></label>
+                                <Input
+                                    type="email"
+                                    placeholder="email@example.com"
+                                    value={checkoutEmail}
+                                    onChange={handleEmailChange}
+                                    required
+                                    className="h-10"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-muted-foreground block mb-1">Customer Name</label>
+                                    <Input
+                                        placeholder="Name"
+                                        value={checkoutName}
+                                        onChange={(e) => setCheckoutName(e.target.value)}
+                                        className="h-9 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-muted-foreground block mb-1">Phone (Optional)</label>
+                                    <Input
+                                        placeholder="Phone"
+                                        value={checkoutPhone}
+                                        onChange={(e) => setCheckoutPhone(e.target.value)}
+                                        className="h-9 text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <div className="flex gap-2 pt-4 border-t border-border">
+                        <Button type="button" variant="ghost" onClick={() => setCheckoutModalOpen(false)} className="flex-1 text-sm h-12">
                             Cancel
                         </Button>
-                        <Button type="submit" className="flex-1 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90">
-                            Continue to Checkout
+                        <Button type="submit" className="flex-1 text-sm h-12 font-bold bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20">
+                            {checkoutAction?.isDraft 
+                                ? (checkoutAction?.isSendToKitchen ? 'Send to Kitchen (Pay Later)' : 'Save Draft Order') 
+                                : 'Confirm Payment & Complete'}
                         </Button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* Apply Discount Coupon Modal */}
+            <Modal isOpen={couponModalOpen} onClose={() => setCouponModalOpen(false)} title="Apply Discount Coupon">
+                <div className="space-y-4">
+                    <div className="bg-accent/20 border border-border p-3 rounded-md text-xs text-muted-foreground">
+                        Enter a valid coupon code to apply to the current order. Note that some coupons may have a minimum order value requirement.
+                    </div>
+                    <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.target);
+                        const code = formData.get('couponCode')?.toString().toUpperCase().replace(/ /g, '');
+                        if (!code) return;
+                        
+                        // Find matching active coupon
+                        const foundCoupon = coupons.find(c => c.code === code && c.active);
+                        if (!foundCoupon) {
+                            alert("Invalid or inactive coupon code.");
+                            return;
+                        }
+
+                        // Check min amount if any (currently handled in posStore if available, but let's check it locally too)
+                        if (foundCoupon.minAmount && subtotal < foundCoupon.minAmount) {
+                            alert(`This coupon requires a minimum cart subtotal of $${foundCoupon.minAmount}`);
+                            return;
+                        }
+
+                        applyCoupon(foundCoupon);
+                        setCouponModalOpen(false);
+                    }} className="flex space-x-2">
+                        <Input
+                            name="couponCode"
+                            placeholder="Enter code (e.g. SAVE20)"
+                            required
+                            className="flex-1 uppercase font-mono"
+                        />
+                        <Button type="submit" className="font-bold whitespace-nowrap">Apply</Button>
+                    </form>
+                </div>
             </Modal>
         </div>
     );

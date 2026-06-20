@@ -30,6 +30,7 @@ public class OrderService {
     private final ReceiptService receiptService;
     private final EmailService emailService;
     private final KdsWebSocketHandler kdsWebSocketHandler;
+    private final AppUserRepository appUserRepository;
 
     @Transactional
     public OrderDto createOrder(AppUser employee, OrderCreateRequest request) {
@@ -109,11 +110,13 @@ public class OrderService {
         order.setTotalAmount(subtotal.add(tax).subtract(discount).max(BigDecimal.ZERO));
 
         // Determine initial status
+        boolean hasPayment = request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank() && !request.getPaymentMethod().equals("unpaid");
+
         if (request.isSendToKitchen()) {
-            order.setStatus(OrderStatus.PENDING);
+            order.setStatus(hasPayment ? OrderStatus.PAID : OrderStatus.PENDING);
             order.setKitchenStatus(KitchenStatus.TO_COOK);
             order.setSentToKitchenAt(LocalDateTime.now());
-        } else if (request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank()) {
+        } else if (hasPayment) {
             order.setStatus(OrderStatus.PAID);
             order.setKitchenStatus(KitchenStatus.TO_COOK);
         } else {
@@ -123,17 +126,26 @@ public class OrderService {
         PosOrder saved = orderRepository.save(order);
         OrderDto dto = OrderDto.from(saved);
 
-        // Send email if paid immediately
-        if (saved.getStatus() == OrderStatus.PAID && saved.getCustomer() != null && saved.getCustomer().getEmail() != null) {
-            String htmlReceipt = receiptService.generateReceiptHtml(dto);
-            emailService.sendReceiptEmail(saved.getCustomer().getEmail(), saved.getCustomer().getName(), saved.getOrderNumber(), htmlReceipt);
+        // Broadcast to KDS WebSocket if requested
+        if (request.isSendToKitchen()) {
+            try {
+                kdsWebSocketHandler.broadcastUpdate(java.util.Map.of(
+                    "type", "NEW_ORDER",
+                    "payload", dto
+                ));
+            } catch (Exception e) {
+                System.err.println("Failed to broadcast KDS update: " + e.getMessage());
+            }
         }
 
-        if (request.isSendToKitchen()) {
-            kdsWebSocketHandler.broadcastUpdate(java.util.Map.of(
-                "type", "NEW_ORDER",
-                "payload", dto
-            ));
+        // Send email if paid immediately (non-blocking try-catch)
+        try {
+            if (saved.getStatus() == OrderStatus.PAID && saved.getCustomer() != null && saved.getCustomer().getEmail() != null) {
+                String htmlReceipt = receiptService.generateReceiptHtml(dto);
+                emailService.sendReceiptEmail(saved.getCustomer().getEmail(), saved.getCustomer().getName(), saved.getOrderNumber(), htmlReceipt);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to send receipt email: " + e.getMessage());
         }
 
         return dto;
@@ -150,6 +162,11 @@ public class OrderService {
         order.setNotes(request.getNotes());
         order.setOrderDate(LocalDateTime.now());
         order.setSelfOrdered(true);
+
+        // Assign a default employee to bypass NOT NULL constraint (e.g., system admin)
+        AppUser defaultEmployee = appUserRepository.findByEmail("admin@cafe.com")
+            .orElseGet(() -> appUserRepository.findAll().stream().findFirst().orElse(null));
+        order.setEmployee(defaultEmployee);
 
         // Generate order number
         String orderNumber = "ORD-PUB-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
@@ -223,16 +240,27 @@ public class OrderService {
         PosOrder saved = orderRepository.save(order);
         OrderDto dto = OrderDto.from(saved);
 
-        // Send email if paid immediately
-        if (saved.getStatus() == OrderStatus.PAID && saved.getCustomer() != null && saved.getCustomer().getEmail() != null) {
-            String htmlReceipt = receiptService.generateReceiptHtml(dto);
-            emailService.sendReceiptEmail(saved.getCustomer().getEmail(), saved.getCustomer().getName(), saved.getOrderNumber(), htmlReceipt);
+        // Broadcast to KDS WebSocket FIRST - this is critical for kitchen display
+        try {
+            kdsWebSocketHandler.broadcastUpdate(java.util.Map.of(
+                "type", "NEW_ORDER",
+                "payload", dto
+            ));
+        } catch (Exception e) {
+            // Log but don't fail the order
+            System.err.println("Failed to broadcast to KDS WebSocket: " + e.getMessage());
         }
 
-        kdsWebSocketHandler.broadcastUpdate(java.util.Map.of(
-            "type", "NEW_ORDER",
-            "payload", dto
-        ));
+        // Send email if paid immediately (non-critical, don't block the order)
+        try {
+            if (saved.getStatus() == OrderStatus.PAID && saved.getCustomer() != null && saved.getCustomer().getEmail() != null) {
+                String htmlReceipt = receiptService.generateReceiptHtml(dto);
+                emailService.sendReceiptEmail(saved.getCustomer().getEmail(), saved.getCustomer().getName(), saved.getOrderNumber(), htmlReceipt);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to send receipt email: " + e.getMessage());
+        }
+
         return dto;
     }
 
@@ -279,8 +307,12 @@ public class OrderService {
         }
 
         PosOrder saved = orderRepository.save(order);
-        kdsWebSocketHandler.broadcastUpdate();
-        return OrderDto.from(saved);
+        OrderDto dto = OrderDto.from(saved);
+        kdsWebSocketHandler.broadcastUpdate(java.util.Map.of(
+            "type", "UPDATE_ORDER",
+            "payload", dto
+        ));
+        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -322,5 +354,13 @@ public class OrderService {
         }
 
         return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderDto> getOrdersByTableAndEmail(Long tableId, String email) {
+        return orderRepository.findByTableIdOrderByOrderDateDesc(tableId).stream()
+            .filter(o -> o.getCustomer() != null && email.equalsIgnoreCase(o.getCustomer().getEmail()))
+            .map(OrderDto::from)
+            .collect(Collectors.toList());
     }
 }

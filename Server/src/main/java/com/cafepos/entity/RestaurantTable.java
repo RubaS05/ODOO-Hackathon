@@ -29,6 +29,12 @@ public class RestaurantTable {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(nullable = false, length = 20)
+    private String status = "AVAILABLE"; // e.g. AVAILABLE, OCCUPIED, RESERVED
+
+    @Column(nullable = false)
+    private Integer occupiedMembers = 0;
+
     // Unique token used for Self Ordering QR (Section 2.10): <domain>/s/<unique-token>
     @Column(unique = true)
     private String qrToken;

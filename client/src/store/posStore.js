@@ -134,11 +134,14 @@ export const usePOSStore = create()(persist((set, get) => ({
         const { cart, activeCoupon, promotions } = get();
         let subtotal = 0;
         let tax = 0;
-        cart.forEach((item) => {
+        cart.forEach(item => {
             const itemTotal = item.product.price * item.quantity;
             subtotal += itemTotal;
-            tax += itemTotal * item.product.taxRate;
+            const rate = Number(item.product.taxRate) || 0;
+            tax += itemTotal * rate;
         });
+        
+        tax = Number.isNaN(tax) ? 0 : tax;
 
         let promoDiscount = 0;
 
@@ -146,23 +149,32 @@ export const usePOSStore = create()(persist((set, get) => ({
         if (promotions && promotions.length > 0) {
             promotions.forEach(promo => {
                 let isEligible = false;
-                if (promo.type === 'product' && promo.productId) {
-                    const cartItem = cart.find(i => i.product.id === promo.productId);
+                const type = promo.type || (promo.appliesTo ? promo.appliesTo.toLowerCase() : null);
+                
+                if (type === 'product' && (promo.productId || promo.product?.id)) {
+                    const pid = promo.productId || promo.product?.id;
+                    const cartItem = cart.find(i => i.product.id === pid);
                     if (cartItem && cartItem.quantity >= (promo.minQuantity || 1)) {
                         isEligible = true;
                     }
-                } else if (promo.type === 'order') {
-                    if (subtotal >= (promo.minAmount || 0)) {
+                } else if (type === 'order') {
+                    if (subtotal >= (promo.minAmount || promo.minOrderAmount || 0)) {
                         isEligible = true;
                     }
+                } else if (!type) {
+                    // Fallback for old promos without type
+                    isEligible = true;
                 }
 
                 if (isEligible) {
                     let calculatedDiscount = 0;
-                    if (promo.discountType === 'percentage') {
-                        calculatedDiscount = subtotal * (promo.discountValue / 100);
+                    const isPercentage = promo.discountType === 'percentage' || promo.discountType === 'PERCENTAGE';
+                    const discountVal = Number(promo.discountValue !== undefined ? promo.discountValue : promo.value) || 0;
+                    
+                    if (isPercentage) {
+                        calculatedDiscount = subtotal * (discountVal / 100);
                     } else {
-                        calculatedDiscount = promo.discountValue;
+                        calculatedDiscount = discountVal;
                     }
                     if (calculatedDiscount > promoDiscount) {
                         promoDiscount = calculatedDiscount;
@@ -175,17 +187,22 @@ export const usePOSStore = create()(persist((set, get) => ({
         if (activeCoupon) {
             // Check if coupon has minimum amount
             if (!activeCoupon.minAmount || subtotal >= activeCoupon.minAmount) {
-                if (activeCoupon.discountType === 'percentage') {
-                    couponDiscount = subtotal * (activeCoupon.value / 100);
+                const isPercentage = activeCoupon.discountType === 'percentage' || activeCoupon.discountType === 'PERCENTAGE';
+                const discountVal = Number(activeCoupon.discountValue !== undefined ? activeCoupon.discountValue : activeCoupon.value) || 0;
+                if (isPercentage) {
+                    couponDiscount = subtotal * (discountVal / 100);
                 } else {
-                    couponDiscount = activeCoupon.value;
+                    couponDiscount = discountVal;
                 }
             }
         }
 
+        promoDiscount = Number.isNaN(promoDiscount) ? 0 : promoDiscount;
+        couponDiscount = Number.isNaN(couponDiscount) ? 0 : couponDiscount;
+
         // Apply both discounts but ensure we don't discount more than the subtotal
         let discount = promoDiscount + couponDiscount;
-        discount = Math.min(discount, subtotal);
+        discount = Number.isNaN(discount) ? 0 : Math.min(discount, subtotal);
 
         const total = Math.max(0, subtotal + tax - discount);
         return {
@@ -221,8 +238,12 @@ export const usePOSStore = create()(persist((set, get) => ({
     setTableQrDataUrl: (id, dataUrl) => set((state) => ({
         tables: state.tables.map((t) => (t.id === id ? { ...t, qrDataUrl: dataUrl } : t)),
     })),
-    setTables: (tables) => set({ tables }),
+    setTables: (tables) => set((state) => ({ tables: typeof tables === 'function' ? tables(state.tables) : tables })),
     addTable: (table) => set((state) => {
+        const existing = state.tables.find(t => String(t.id) === String(table.id));
+        if (existing) {
+            return { tables: state.tables.map(t => String(t.id) === String(table.id) ? table : t) };
+        }
         return {
             tables: [...state.tables, table]
         };
@@ -391,6 +412,7 @@ export const usePOSStore = create()(persist((set, get) => ({
         coupons: state.coupons.filter((c) => c.id !== id),
     })),
     // Promotions
+    setPromotions: (promotions) => set({ promotions }),
     addPromotion: (promo) => set((state) => ({
         promotions: [...state.promotions, { ...promo, id: `promo-${Date.now()}` }],
     })),

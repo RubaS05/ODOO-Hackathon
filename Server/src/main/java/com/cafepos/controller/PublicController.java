@@ -7,6 +7,10 @@ import com.cafepos.entity.Product;
 import com.cafepos.service.CategoryService;
 import com.cafepos.service.OrderService;
 import com.cafepos.service.ProductService;
+import com.cafepos.dto.TableDto;
+import com.cafepos.service.TableService;
+import com.cafepos.dto.CustomerDto;
+import com.cafepos.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +25,8 @@ public class PublicController {
     private final ProductService productService;
     private final CategoryService categoryService;
     private final OrderService orderService;
+    private final TableService tableService;
+    private final CustomerRepository customerRepository;
 
     @GetMapping("/products")
     public ResponseEntity<List<Product>> getActiveProducts() {
@@ -30,6 +36,11 @@ public class PublicController {
     @GetMapping("/categories")
     public ResponseEntity<List<Category>> getCategories() {
         return ResponseEntity.ok(categoryService.getAllCategories());
+    }
+
+    @GetMapping("/tables/{id}")
+    public ResponseEntity<TableDto> getTable(@PathVariable Long id) {
+        return ResponseEntity.ok(tableService.getTableById(id));
     }
 
     @PostMapping("/orders")
@@ -51,5 +62,12 @@ public class PublicController {
     @PutMapping("/orders/{id}/pay")
     public ResponseEntity<OrderDto> payOrder(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.updateOrderStatus(id, "PAID"));
+    }
+
+    @GetMapping("/tables/{tableId}/orders")
+    public ResponseEntity<List<OrderDto>> getTableOrders(
+            @PathVariable Long tableId,
+            @RequestParam String email) {
+        return ResponseEntity.ok(orderService.getOrdersByTableAndEmail(tableId, email));
     }
 }

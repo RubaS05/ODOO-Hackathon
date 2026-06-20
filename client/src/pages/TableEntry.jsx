@@ -8,13 +8,45 @@ const TableEntry = () => {
     const { tableId } = useParams();
     const navigate = useNavigate();
     const tables = usePOSStore((s) => s.tables);
-    const table = tables.find((t) => t.id === tableId);
+    const table = tables.find((t) => String(t.id) === String(tableId));
 
     const [step, setStep] = useState('email'); // 'email' | 'name'
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [tableNotFound, setTableNotFound] = useState(!table);
+
+    useEffect(() => {
+        const fetchTable = async () => {
+            if (!table && tableId) {
+                try {
+                    const { apiService } = await import('../services/api');
+                    const fetchedTable = await apiService.public.getTableById(tableId);
+                    
+                    if (fetchedTable) {
+                        const mapped = {
+                            ...fetchedTable,
+                            number: fetchedTable.tableNumber,
+                            floor: fetchedTable.floorName || fetchedTable.floor?.name || '1st Floor',
+                            status: fetchedTable.status ? fetchedTable.status.toLowerCase() : (fetchedTable.active ? 'available' : 'unavailable'),
+                            occupiedMembers: fetchedTable.occupiedMembers || 0,
+                        };
+                        usePOSStore.getState().addTable(mapped);
+                        setTableNotFound(false);
+                    } else {
+                        setTableNotFound(true);
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch table", err);
+                    setTableNotFound(true);
+                }
+            } else if (table) {
+                setTableNotFound(false);
+            }
+        };
+        fetchTable();
+    }, [table, tableId]);
 
     // If customer already identified in this browser, skip straight to dashboard
     useEffect(() => {
@@ -103,9 +135,14 @@ const TableEntry = () => {
                             Table {table.number} &bull; {table.floor}
                         </p>
                     )}
-                    {!table && (
+                    {!table && tableNotFound && (
                         <p style={{ fontSize: '13px', color: '#f87171', marginTop: '6px' }}>
                             Table not found. Please scan the QR code on your table.
+                        </p>
+                    )}
+                    {!table && !tableNotFound && (
+                        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginTop: '6px' }}>
+                            Loading table details...
                         </p>
                     )}
                 </div>

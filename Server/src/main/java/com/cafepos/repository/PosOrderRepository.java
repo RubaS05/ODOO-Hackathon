@@ -8,6 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 
+import org.springframework.data.jpa.repository.EntityGraph;
+import java.util.Optional;
+
 public interface PosOrderRepository extends JpaRepository<PosOrder, Long> {
     List<PosOrder> findBySessionOrderByOrderDateDesc(PosSession session);
     List<PosOrder> findByKitchenStatusInOrderByOrderDateAsc(List<KitchenStatus> statuses);

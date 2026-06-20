@@ -16,8 +16,10 @@ export const TableManagement = () => {
     const navigate = useNavigate();
     const {
         tables, orders, assignTable, setTableStatus,
-        setTables, addTable, deleteTable, setTableQrDataUrl
+        setTables, addTable, deleteTable, setTableQrDataUrl, currentUser
     } = usePOSStore();
+
+    const isAdmin = currentUser?.role === 'ADMIN';
 
     const [selectedFloor, setSelectedFloor] = useState('');
     const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -31,11 +33,16 @@ export const TableManagement = () => {
     const [newTableSeats, setNewTableSeats] = useState(4);
     const [newTableFloor, setNewTableFloor] = useState('1st Floor');
 
+    const [manageFloorsOpen, setManageFloorsOpen] = useState(false);
+    const [newFloorName, setNewFloorName] = useState('');
+    const [serverFloors, setServerFloors] = useState([]);
+
     // Available floors list
     const floors = useMemo(() => {
+        if (serverFloors.length > 0) return serverFloors;
         const f = Array.from(new Set(tables.map((t) => t.floor).filter(Boolean)));
         return f.length ? f : ['1st Floor'];
-    }, [tables]);
+    }, [tables, serverFloors]);
 
     // Auto-select first floor
     useEffect(() => {
@@ -70,14 +77,18 @@ export const TableManagement = () => {
     const loadTables = async () => {
         try {
             const apiTables = await apiService.tables.getAll();
+            const apiFloors = await apiService.floors.getAll();
+            setServerFloors(apiFloors.map(f => f.name));
+
             const mapped = await Promise.all(apiTables.map(async (t) => {
                 const qrUrl = t.qrCodeUrl || `${window.location.origin}/table/${t.id}`;
                 const dataUrl = await generateQrDataUrl(qrUrl);
                 return {
                     ...t,
                     number: t.tableNumber,
-                    floor: t.floor?.name || '1st Floor',
-                    status: t.active ? 'available' : 'unavailable',
+                    floor: t.floorName || t.floor?.name || '1st Floor',
+                    status: t.status ? t.status.toLowerCase() : (t.active ? 'available' : 'unavailable'),
+                    occupiedMembers: t.occupiedMembers || 0,
                     qrDataUrl: dataUrl
                 };
             }));
@@ -89,6 +100,70 @@ export const TableManagement = () => {
 
     useEffect(() => {
         loadTables();
+
+        // Setup real-time WebSocket connection
+        const wsUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8082/api').replace('http', 'ws').replace('/api', '') + '/ws/tables';
+        let ws;
+        let reconnectTimer;
+
+        const connect = () => {
+            ws = new WebSocket(wsUrl);
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    // Either a table was deleted or updated/created
+                    if (data.deletedTableId) {
+                        setTables(prev => prev.filter(t => t.id !== data.deletedTableId));
+                    } else if (data.id) {
+                        // Table updated or created
+                        setTables(prev => {
+                            const exists = prev.find(t => t.id === data.id);
+                            if (exists) {
+                                return prev.map(t => t.id === data.id ? {
+                                    ...t,
+                                    number: data.tableNumber,
+                                    floor: data.floorName || t.floor,
+                                    status: data.status ? data.status.toLowerCase() : 'available',
+                                    occupiedMembers: data.occupiedMembers || 0
+                                } : t);
+                            } else {
+                                // For a brand new table, we should ideally generate the QR code too.
+                                // Calling loadTables() handles all that cleanly instead of duplicating logic.
+                                loadTables();
+                                return prev;
+                            }
+                        });
+                        
+                        // If the currently open modal is this table, update it
+                        setActiveTableDetail(prev => {
+                            if (prev && prev.table.id === data.id) {
+                                return {
+                                    ...prev,
+                                    table: {
+                                        ...prev.table,
+                                        status: data.status ? data.status.toLowerCase() : 'available',
+                                        occupiedMembers: data.occupiedMembers || 0
+                                    }
+                                };
+                            }
+                            return prev;
+                        });
+                    }
+                } catch (e) {
+                    console.error("WS parse error", e);
+                }
+            };
+            ws.onclose = () => {
+                reconnectTimer = setTimeout(connect, 3000);
+            };
+        };
+
+        connect();
+
+        return () => {
+            clearTimeout(reconnectTimer);
+            if (ws) ws.close();
+        };
     }, []);
 
     const handleCreateTable = async (e) => {
@@ -120,9 +195,38 @@ export const TableManagement = () => {
             setNewTableNo('');
             setNewTableSeats(4);
             setCreateModalOpen(false);
+            loadTables(); // Refresh to ensure backend sync
         } catch (error) {
             console.error("Failed to create table", error);
             alert("Error creating table");
+        }
+    };
+
+    const handleCreateFloor = async (e) => {
+        e.preventDefault();
+        if (!newFloorName) return;
+        try {
+            await apiService.floors.create({ name: newFloorName });
+            setNewFloorName('');
+            loadTables();
+        } catch (err) {
+            console.error("Failed to create floor", err);
+            alert("Error creating floor");
+        }
+    };
+
+    const handleDeleteFloor = async (floorName) => {
+        if (!confirm(`Are you sure you want to delete ${floorName}? This will fail if tables exist on this floor.`)) return;
+        try {
+            const apiFloors = await apiService.floors.getAll();
+            const f = apiFloors.find(fl => fl.name === floorName);
+            if (f) {
+                await apiService.floors.delete(f.id);
+                loadTables();
+            }
+        } catch (err) {
+            console.error("Failed to delete floor", err);
+            alert("Cannot delete floor. Make sure it has no tables.");
         }
     };
 
@@ -196,13 +300,38 @@ export const TableManagement = () => {
         <div className="space-y-6">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight">Table Layout</h1>
-                    <p className="text-muted-foreground">Manage tables and QR codes. Click any table to view or print its QR.</p>
+                <div className="flex items-center gap-4">
+                    <div>
+                        <h1 className="text-3xl font-extrabold tracking-tight">Table Layout</h1>
+                        <p className="text-muted-foreground">Manage tables and view status.</p>
+                    </div>
+                    {/* Dashboard Banner */}
+                    <div className="hidden sm:flex items-center gap-3 bg-card px-4 py-2 rounded-lg border border-border shadow-sm">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground">Occupied</span>
+                            <span className="font-mono font-black text-lg text-rose-500 leading-none">
+                                {tables.reduce((sum, t) => sum + (Number(t.occupiedMembers) || 0), 0)}
+                            </span>
+                        </div>
+                        <div className="w-px h-8 bg-border"></div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground">Total Seats</span>
+                            <span className="font-mono font-black text-lg text-emerald-500 leading-none">
+                                {tables.reduce((sum, t) => sum + (Number(t.seats) || 0), 0)}
+                            </span>
+                        </div>
+                    </div>
                 </div>
-                <Button onClick={() => setCreateModalOpen(true)} className="font-bold text-xs h-9 cursor-pointer">
-                    <Plus size={14} className="mr-1.5" /> Add New Table
-                </Button>
+                {isAdmin && (
+                    <div className="flex gap-2">
+                        <Button onClick={() => setManageFloorsOpen(true)} variant="outline" className="font-bold text-xs h-9 cursor-pointer">
+                            Manage Floors
+                        </Button>
+                        <Button onClick={() => setCreateModalOpen(true)} className="font-bold text-xs h-9 cursor-pointer">
+                            <Plus size={14} className="mr-1.5" /> Add New Table
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {/* Floor Filter Tabs */}
@@ -238,9 +367,14 @@ export const TableManagement = () => {
                         </CardHeader>
                         <CardContent className="p-4 pt-1 space-y-3">
                             <h3 className="font-black text-3xl tracking-tight font-mono">{table.number}</h3>
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <User size={14} />
-                                <span>{table.seats} Seats</span>
+                            <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1.5">
+                                    <User size={14} />
+                                    <span>{table.seats} Seats</span>
+                                </div>
+                                <div className="font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                                    {table.occupiedMembers}/{table.seats}
+                                </div>
                             </div>
                             {table.qrDataUrl && (
                                 <div className="flex items-center gap-1 text-xs text-primary font-semibold">
@@ -283,9 +417,9 @@ export const TableManagement = () => {
                         value={newTableFloor}
                         onChange={(e) => setNewTableFloor(e.target.value)}
                     >
-                        <option value="1st Floor">1st Floor</option>
-                        <option value="2nd Floor">2nd Floor</option>
-                        <option value="Outdoor">Outdoor</option>
+                        {floors.map(f => (
+                            <option key={f} value={f}>{f}</option>
+                        ))}
                     </Select>
                     <Button type="submit" className="w-full font-bold">
                         Create Table &amp; Generate QR
@@ -303,22 +437,68 @@ export const TableManagement = () => {
                 {activeTableDetail && (
                     <div className="space-y-5 text-sm">
                         {/* Meta */}
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center bg-card p-3 rounded-xl border border-border/50 shadow-sm">
                             <div>
-                                <p className="text-xs text-muted-foreground uppercase font-semibold">Location &amp; Seats</p>
-                                <p className="font-bold">{activeTableDetail.table.floor} &bull; {activeTableDetail.table.seats} Seats</p>
+                                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Live Tracking</p>
+                                <div className="flex items-center gap-3">
+                                    <Select 
+                                        className="h-8 text-xs font-bold" 
+                                        value={activeTableDetail.table.status.toUpperCase()} 
+                                        onChange={(e) => {
+                                            const status = e.target.value;
+                                            const occupied = status === 'AVAILABLE' ? 0 : (Number(activeTableDetail.table.occupiedMembers) || 0);
+                                            setActiveTableDetail(prev => ({...prev, hasUnsavedChanges: true, table: {...prev.table, status: status.toLowerCase(), occupiedMembers: occupied}}));
+                                        }}
+                                    >
+                                        <option value="AVAILABLE">Available</option>
+                                        <option value="OCCUPIED">Occupied</option>
+                                        <option value="RESERVED">Reserved</option>
+                                    </Select>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-muted-foreground">Members:</span>
+                                        <div className="flex items-center">
+                                            <button 
+                                                onClick={() => {
+                                                    const currentMem = Number(activeTableDetail.table.occupiedMembers) || 0;
+                                                    const newMem = Math.max(0, currentMem - 1);
+                                                    setActiveTableDetail(prev => ({...prev, hasUnsavedChanges: true, table: {...prev.table, occupiedMembers: newMem}}));
+                                                }}
+                                                className="w-6 h-6 rounded bg-accent flex items-center justify-center font-bold text-lg hover:bg-primary hover:text-white transition-colors"
+                                            >-</button>
+                                            <span className="w-8 text-center font-mono font-bold">{Number(activeTableDetail.table.occupiedMembers) || 0}</span>
+                                            <button 
+                                                onClick={() => {
+                                                    const currentMem = Number(activeTableDetail.table.occupiedMembers) || 0;
+                                                    const newMem = Math.min(activeTableDetail.table.seats, currentMem + 1);
+                                                    setActiveTableDetail(prev => ({...prev, hasUnsavedChanges: true, table: {...prev.table, occupiedMembers: newMem}}));
+                                                }}
+                                                className="w-6 h-6 rounded bg-accent flex items-center justify-center font-bold text-lg hover:bg-primary hover:text-white transition-colors"
+                                            >+</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex gap-1.5">
-                                <Button
-                                    variant="outline" size="sm"
-                                    onClick={() => handleUpdateStatus(activeTableDetail.table.id, 'available')}
-                                    className={`text-xs h-8 ${activeTableDetail.table.status === 'available' ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : ''}`}
-                                >Available</Button>
-                                <Button
-                                    variant="outline" size="sm"
-                                    onClick={() => handleUpdateStatus(activeTableDetail.table.id, 'reserved')}
-                                    className={`text-xs h-8 ${activeTableDetail.table.status === 'reserved' ? 'bg-amber-500/15 text-amber-600 border-amber-500/30' : ''}`}
-                                >Reserve</Button>
+                            <div className="text-right flex flex-col justify-between items-end h-full">
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase font-semibold">Location</p>
+                                    <p className="font-bold">{activeTableDetail.table.floor}</p>
+                                </div>
+                                <Button 
+                                    size="sm"
+                                    className="mt-2 h-8 text-xs font-bold bg-primary text-white"
+                                    onClick={() => {
+                                        const { id, status, occupiedMembers } = activeTableDetail.table;
+                                        apiService.tables.update(id, { 
+                                            status: status.toUpperCase(), 
+                                            occupiedMembers: Number(occupiedMembers) || 0 
+                                        }).then(() => {
+                                            loadTables();
+                                            setActiveTableDetail(prev => ({...prev, hasUnsavedChanges: false}));
+                                        });
+                                    }}
+                                >
+                                    {activeTableDetail.hasUnsavedChanges ? 'Save Updates' : 'Force Update'}
+                                </Button>
                             </div>
                         </div>
 
@@ -428,16 +608,44 @@ export const TableManagement = () => {
                             </div>
                         )}
 
-                        {/* Delete */}
-                        <div className="flex justify-end border-t border-border/40 pt-4">
-                            <Button
-                                variant="ghost"
-                                className="text-xs text-destructive hover:bg-destructive/10 cursor-pointer h-9"
-                                onClick={() => handleDeleteTableClick(activeTableDetail.table.id)}
-                            >Delete Table</Button>
-                        </div>
+                        {/* Delete (Admin Only) */}
+                        {isAdmin && (
+                            <div className="flex justify-end border-t border-border/40 pt-4">
+                                <Button
+                                    variant="ghost"
+                                    className="text-xs text-destructive hover:bg-destructive/10 cursor-pointer h-9"
+                                    onClick={() => handleDeleteTableClick(activeTableDetail.table.id)}
+                                >Delete Table</Button>
+                            </div>
+                        )}
                     </div>
                 )}
+            </Modal>
+
+            {/* ── Floor Management Modal (Admin Only) ────────────────────── */}
+            <Modal isOpen={manageFloorsOpen} onClose={() => setManageFloorsOpen(false)} title="Manage Floors" size="sm">
+                <div className="space-y-4">
+                    <form onSubmit={handleCreateFloor} className="flex gap-2">
+                        <Input 
+                            value={newFloorName} 
+                            onChange={(e) => setNewFloorName(e.target.value)} 
+                            placeholder="New Floor Name..." 
+                            required 
+                        />
+                        <Button type="submit" className="shrink-0 font-bold">Add</Button>
+                    </form>
+                    
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        {serverFloors.map(floor => (
+                            <div key={floor} className="flex justify-between items-center p-2 rounded-lg border border-border bg-card">
+                                <span className="font-bold text-sm">{floor}</span>
+                                <Button variant="ghost" size="sm" onClick={() => handleDeleteFloor(floor)} className="h-7 px-2 text-destructive hover:bg-destructive/10">
+                                    Remove
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </Modal>
         </div>
     );

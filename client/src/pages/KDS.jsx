@@ -42,7 +42,7 @@ export const KDS = () => {
 
     useEffect(() => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname === 'localhost' ? 'localhost:8080' : window.location.host;
+        const host = window.location.hostname === 'localhost' ? 'localhost:8082' : window.location.host;
         const ws = new WebSocket(`${protocol}//${host}/ws/kds`);
 
         ws.onopen = () => console.log('KDS WebSocket Connected');

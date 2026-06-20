@@ -16,7 +16,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class KdsWebSocketHandler extends TextWebSocketHandler {
 
     private final List<WebSocketSession> sessions = new CopyOnWriteArrayList<>();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+
+    public KdsWebSocketHandler(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {

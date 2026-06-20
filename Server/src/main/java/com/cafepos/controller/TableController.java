@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
 import java.util.List;
 
 @RestController
@@ -22,6 +24,7 @@ public class TableController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TableDto> createTable(@RequestBody TableRequest request) {
         return ResponseEntity.ok(tableService.createTable(request));
     }
@@ -34,6 +37,7 @@ public class TableController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteTable(@PathVariable Long id) {
         tableService.deleteTable(id);
         return ResponseEntity.noContent().build();

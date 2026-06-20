@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Eye, Edit2, Trash2, Banknote } from 'lucide-react';
+import { Search, Eye, Edit2, Trash2, Banknote, DollarSign, CreditCard, QrCode } from 'lucide-react';
+import QRCode from 'qrcode';
 import { apiService } from '../services/api';
+import { usePOSStore } from '../store/posStore';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table';
 import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -10,6 +12,7 @@ import { Modal } from '../components/ui/Modal';
 import { Pagination } from '../components/ui/Pagination';
 
 export const Orders = () => {
+    const { storeSettings } = usePOSStore();
     const [orders, setOrders] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -17,6 +20,12 @@ export const Orders = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const rowsPerPage = 10;
+
+    // Payment State (embedded in View Modal)
+    const [selectedPaymentType, setSelectedPaymentType] = useState('cash');
+    const [cashAmountReceived, setCashAmountReceived] = useState('');
+    const [cardReference, setCardReference] = useState('');
+    const [upiQrCode, setUpiQrCode] = useState('');
 
     const loadOrders = async () => {
         try {
@@ -35,16 +44,18 @@ export const Orders = () => {
     }, []);
 
     const filteredOrders = useMemo(() => {
-        return orders.filter((o) => {
-            const matchesSearch = o.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (o.customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+        return orders.filter(order => {
+            const matchesSearch = 
+                (order.orderNumber && order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (order.customerName && order.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (order.customerEmail && order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()));
             
             let statusMatches = false;
             if (statusFilter === 'all') statusMatches = true;
-            else if (statusFilter === 'draft') statusMatches = o.status === 'DRAFT';
-            else if (statusFilter === 'pending') statusMatches = o.status === 'PENDING' || o.status === 'READY';
-            else if (statusFilter === 'paid') statusMatches = o.status === 'PAID';
-            else if (statusFilter === 'cancelled') statusMatches = o.status === 'CANCELLED';
+            else if (statusFilter === 'draft') statusMatches = order.status === 'DRAFT';
+            else if (statusFilter === 'pending') statusMatches = order.status === 'PENDING' || order.status === 'READY';
+            else if (statusFilter === 'paid') statusMatches = order.status === 'PAID';
+            else if (statusFilter === 'cancelled') statusMatches = order.status === 'CANCELLED';
 
             return matchesSearch && statusMatches;
         });
@@ -58,16 +69,63 @@ export const Orders = () => {
     const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
     const paginatedOrders = filteredOrders.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
-    const handlePayBill = async (orderId) => {
-        if (confirm('Are you sure you want to mark this bill as PAID?')) {
-            try {
-                await apiService.orders.updateStatus(orderId, 'PAID');
-                loadOrders(); // Refresh orders
-                setSelectedOrder(null);
-            } catch (error) {
-                console.error("Failed to pay bill", error);
-                alert("Failed to pay bill. Please try again.");
+    // Cash change calculation
+    const changeDue = useMemo(() => {
+        if (!selectedOrder) return 0;
+        const received = parseFloat(cashAmountReceived);
+        if (isNaN(received) || received < selectedOrder.totalAmount) return 0;
+        return parseFloat((received - selectedOrder.totalAmount).toFixed(2));
+    }, [cashAmountReceived, selectedOrder]);
+
+    const handleQuickCash = (amount) => {
+        setCashAmountReceived(amount.toString());
+    };
+
+    // Generate UPI QR Code when needed
+    useEffect(() => {
+        if (selectedOrder && (selectedOrder.status === 'PENDING' || selectedOrder.status === 'READY') && selectedPaymentType === 'upi') {
+            const upiId = storeSettings?.upiId || 'prathaban009-1@okhdfcbank';
+            const name = storeSettings?.businessName || 'GastroPOS';
+            const url = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}&am=${selectedOrder.totalAmount.toFixed(2)}&cu=INR`;
+            QRCode.toDataURL(url, { width: 300, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+                .then(url => setUpiQrCode(url))
+                .catch(err => console.error(err));
+        }
+    }, [selectedOrder, selectedPaymentType, storeSettings]);
+
+    const handleViewOrder = (order) => {
+        setSelectedOrder(order);
+        setSelectedPaymentType('cash');
+        setCashAmountReceived('');
+        setCardReference('');
+    };
+
+    const confirmPayment = async (e) => {
+        e.preventDefault();
+        if (!selectedOrder) return;
+        
+        if (selectedPaymentType === 'cash') {
+            const received = parseFloat(cashAmountReceived) || selectedOrder.totalAmount;
+            if (received < selectedOrder.totalAmount) {
+                alert('Received cash is less than order total.');
+                return;
             }
+        } else if (selectedPaymentType === 'card') {
+            if (!cardReference.trim()) {
+                alert('Please enter a card transaction reference.');
+                return;
+            }
+        }
+
+        try {
+            await apiService.orders.updateStatus(selectedOrder.id, 'PAID');
+            loadOrders(); // Refresh orders
+            
+            // Just update selected order locally so UI updates to paid instantly without closing
+            setSelectedOrder(prev => ({ ...prev, status: 'PAID' }));
+        } catch (error) {
+            console.error("Failed to pay bill", error);
+            alert("Failed to pay bill. Please try again.");
         }
     };
 
@@ -116,7 +174,7 @@ export const Orders = () => {
                     <TableRow>
                         <TableHead>Order Number</TableHead>
                         <TableHead>Date / Time</TableHead>
-                        <TableHead>Customer</TableHead>
+                        <TableHead>Customer Email</TableHead>
                         <TableHead>Service</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Payment Status</TableHead>
@@ -127,28 +185,23 @@ export const Orders = () => {
                 <TableBody>
                     {isLoading ? (
                         <TableRow>
-                            <TableCell colSpan={7} className="text-center py-12 text-muted-foreground text-xs">Loading orders...</TableCell>
+                            <TableCell colSpan={8} className="text-center py-12 text-muted-foreground text-xs">Loading orders...</TableCell>
                         </TableRow>
                     ) : paginatedOrders.length > 0 ? (
                         paginatedOrders.map((order) => (
                             <TableRow key={order.id}>
                                 <TableCell className="font-mono font-bold text-xs">{order.orderNumber}</TableCell>
                                 <TableCell className="text-xs">{new Date(order.orderDate).toLocaleString()}</TableCell>
-                                <TableCell className="text-xs font-semibold">{order.customer?.name || 'Walk-in Guest'}</TableCell>
+                                <TableCell className="text-xs font-semibold">{order.customerEmail || order.customerName || 'Walk-in Guest'}</TableCell>
                                 <TableCell className="text-xs capitalize">{order.orderType}</TableCell>
                                 <TableCell className="font-mono font-bold text-xs">₹{order.totalAmount?.toFixed(2)}</TableCell>
                                 <TableCell>{getPaymentStatusBadge(order.status)}</TableCell>
                                 <TableCell>{getFoodStatusBadge(order.kitchenStatus, order.status)}</TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-1.5">
-                                        <Button variant="outline" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                                        <Button variant="outline" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => handleViewOrder(order)}>
                                             <Eye size={14}/>
                                         </Button>
-                                        {(order.status === 'PENDING' || order.status === 'READY') && (
-                                            <Button variant="secondary" size="icon" className="h-8 w-8 cursor-pointer text-emerald-600 hover:bg-emerald-100" onClick={() => handlePayBill(order.id)} title="Pay Bill">
-                                                <Banknote size={14}/>
-                                            </Button>
-                                        )}
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -182,7 +235,12 @@ export const Orders = () => {
                             )}
                             <div className="flex justify-between text-xxs">
                                 <span className="text-muted-foreground">CUSTOMER:</span>
-                                <span>{selectedOrder.customer?.name || 'Walk-in Guest'}</span>
+                                <div className="text-right">
+                                    <span>{selectedOrder.customerName || 'Walk-in Guest'}</span>
+                                    {selectedOrder.customerEmail && (
+                                        <div className="text-muted-foreground">{selectedOrder.customerEmail}</div>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex justify-between text-xxs items-center">
                                 <span className="text-muted-foreground">PAYMENT:</span>
@@ -236,15 +294,96 @@ export const Orders = () => {
                             </div>
                         )}
 
-                        <div className="flex gap-2 border-t border-border/40 pt-4 font-sans">
+                        {/* Payment Section embedded for Unpaid Orders */}
+                        {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'READY') && (
+                            <form onSubmit={confirmPayment} className="mt-4 pt-4 border-t border-border/40 space-y-4">
+                                <h4 className="font-bold text-xxs text-muted-foreground uppercase">Payment Details</h4>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button type="button" onClick={() => setSelectedPaymentType('cash')} className={`py-2 px-3 rounded border flex flex-col items-center gap-1 cursor-pointer transition-all ${selectedPaymentType === 'cash' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600' : 'bg-card border-border text-muted-foreground hover:bg-accent'}`}>
+                                        <DollarSign size={16} />
+                                        <span className="text-xxs font-bold">Cash</span>
+                                    </button>
+                                    <button type="button" onClick={() => setSelectedPaymentType('card')} className={`py-2 px-3 rounded border flex flex-col items-center gap-1 cursor-pointer transition-all ${selectedPaymentType === 'card' ? 'bg-primary/10 border-primary text-primary' : 'bg-card border-border text-muted-foreground hover:bg-accent'}`}>
+                                        <CreditCard size={16} />
+                                        <span className="text-xxs font-bold">Card</span>
+                                    </button>
+                                    <button type="button" onClick={() => setSelectedPaymentType('upi')} className={`py-2 px-3 rounded border flex flex-col items-center gap-1 cursor-pointer transition-all ${selectedPaymentType === 'upi' ? 'bg-primary/10 border-primary text-primary' : 'bg-card border-border text-muted-foreground hover:bg-accent'}`}>
+                                        <QrCode size={16} />
+                                        <span className="text-xxs font-bold">UPI</span>
+                                    </button>
+                                </div>
+
+                                <div className="pt-2">
+                                    {selectedPaymentType === 'cash' && (
+                                        <div className="space-y-3 animate-in fade-in duration-200">
+                                            <Input
+                                                label="Amount Received (₹)"
+                                                type="number"
+                                                min={selectedOrder.totalAmount}
+                                                step="0.01"
+                                                value={cashAmountReceived}
+                                                onChange={(e) => setCashAmountReceived(e.target.value)}
+                                                placeholder={selectedOrder.totalAmount.toFixed(2)}
+                                            />
+                                            <div className="flex gap-2">
+                                                {[selectedOrder.totalAmount, 500, 1000, 2000].filter(a => a >= selectedOrder.totalAmount).slice(0, 4).map(amt => (
+                                                    <button key={amt} type="button" onClick={() => handleQuickCash(amt)} className="px-2 py-1 bg-accent hover:bg-accent/80 rounded border border-border text-xxs font-mono cursor-pointer">
+                                                        ₹{amt === selectedOrder.totalAmount ? 'Exact' : amt}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {changeDue > 0 && (
+                                                <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs flex justify-between text-emerald-600 font-bold">
+                                                    <span>Change Due:</span>
+                                                    <span className="font-mono">₹{changeDue.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {selectedPaymentType === 'card' && (
+                                        <div className="space-y-3 animate-in fade-in duration-200">
+                                            <Input
+                                                label="Card Reference / Last 4 Digits *"
+                                                value={cardReference}
+                                                onChange={(e) => setCardReference(e.target.value)}
+                                                placeholder="e.g. 4242 or AUTH-12345"
+                                                required={selectedPaymentType === 'card'}
+                                            />
+                                            <p className="text-xxs text-muted-foreground">Swipe or insert card on the external terminal, then enter the reference.</p>
+                                        </div>
+                                    )}
+
+                                    {selectedPaymentType === 'upi' && (
+                                        <div className="animate-in fade-in duration-200 flex flex-col items-center">
+                                            <div className="bg-white p-2 rounded-xl shadow-sm border border-border/50">
+                                                {upiQrCode ? (
+                                                    <img src={upiQrCode} alt="UPI QR Code" className="w-24 h-24" />
+                                                ) : (
+                                                    <div className="w-24 h-24 bg-gray-100 animate-pulse rounded flex items-center justify-center">
+                                                        <QrCode className="text-gray-300" size={24} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <p className="text-xxs font-mono mt-2 text-muted-foreground bg-accent px-2 py-1 rounded">
+                                                {storeSettings?.upiId || 'prathaban009-1@okhdfcbank'}
+                                            </p>
+                                            <p className="text-xxs text-muted-foreground mt-1 text-center max-w-[200px]">
+                                                Scan to pay <strong className="text-foreground">₹{selectedOrder.totalAmount?.toFixed(2)}</strong>
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                <Button type="submit" className="w-full text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600">
+                                    Mark Payment Completed
+                                </Button>
+                            </form>
+                        )}
+
+                        <div className="flex gap-2 border-t border-border/40 pt-4 mt-4 font-sans">
                             <Button variant="outline" className="flex-1 font-bold text-xs h-9 cursor-pointer" onClick={() => window.print()}>
                                 Print Receipt
                             </Button>
-                            {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'READY') && (
-                                <Button className="flex-1 font-bold text-xs h-9 cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handlePayBill(selectedOrder.id)}>
-                                    Pay Bill (₹{selectedOrder.totalAmount?.toFixed(2)})
-                                </Button>
-                            )}
                             <Button variant="ghost" className="flex-1 text-xs h-9 cursor-pointer" onClick={() => setSelectedOrder(null)}>
                                 Close View
                             </Button>

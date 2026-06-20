@@ -152,6 +152,21 @@ export const apiService = {
         },
     },
 
+    /* ─── FLOORS ─────────────────────────────────────────────── */
+    floors: {
+        getAll: async () => {
+            const res = await apiClient.get('/floors');
+            return res.data;
+        },
+        create: async (floor) => {
+            const res = await apiClient.post('/floors', floor);
+            return res.data;
+        },
+        delete: async (id) => {
+            await apiClient.delete(`/floors/${id}`);
+        },
+    },
+
     /* ─── TABLES ─────────────────────────────────────────────── */
     tables: {
         getAll: async () => {
@@ -224,6 +239,37 @@ export const apiService = {
         },
     },
 
+    /* ─── COUPONS & PROMOTIONS ───────────────────────────────── */
+    coupons: {
+        getAll: async () => {
+            const res = await apiClient.get('/coupons');
+            return res.data;
+        },
+        create: async (coupon) => {
+            const res = await apiClient.post('/coupons', coupon);
+            return res.data;
+        },
+        toggle: async (id) => {
+            const res = await apiClient.put(`/coupons/${id}/toggle`);
+            return res.data;
+        },
+    },
+
+    promotions: {
+        getAll: async () => {
+            const res = await apiClient.get('/promotions');
+            return res.data;
+        },
+        create: async (promotion) => {
+            const res = await apiClient.post('/promotions', promotion);
+            return res.data;
+        },
+        toggle: async (id) => {
+            const res = await apiClient.put(`/promotions/${id}/toggle`);
+            return res.data;
+        },
+    },
+
     /* ─── PUBLIC (CUSTOMER) ──────────────────────────────────── */
     public: {
         getProducts: async () => {
@@ -232,6 +278,10 @@ export const apiService = {
         },
         getCategories: async () => {
             const res = await apiClient.get('/public/categories');
+            return res.data;
+        },
+        getTableById: async (id) => {
+            const res = await apiClient.get(`/public/tables/${id}`);
             return res.data;
         },
         createOrder: async (orderData) => {
@@ -248,6 +298,10 @@ export const apiService = {
         },
         payOrder: async (id) => {
             const res = await apiClient.put(`/public/orders/${id}/pay`);
+            return res.data;
+        },
+        getTableOrders: async (tableId, email) => {
+            const res = await apiClient.get(`/public/tables/${tableId}/orders`, { params: { email } });
             return res.data;
         },
     },

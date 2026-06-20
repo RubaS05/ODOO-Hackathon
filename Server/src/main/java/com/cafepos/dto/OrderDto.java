@@ -18,6 +18,7 @@ public class OrderDto {
     private OrderStatus status;
     private KitchenStatus kitchenStatus;
     private String customerName;
+    private String customerEmail;
     private Long customerId;
     private String tableNumber;
     private Long tableId;
@@ -55,6 +56,7 @@ public class OrderDto {
         }
         if (o.getCustomer() != null) {
             dto.setCustomerName(o.getCustomer().getName());
+            dto.setCustomerEmail(o.getCustomer().getEmail());
             dto.setCustomerId(o.getCustomer().getId());
         }
         if (o.getTable() != null) {

@@ -34,7 +34,7 @@ public class KitchenService {
             KitchenStatus.TO_COOK, KitchenStatus.PREPARING, KitchenStatus.COMPLETED
         );
         return orderRepository.findByKitchenStatusInOrderByOrderDateAsc(activeStatuses).stream()
-            .filter(o -> o.getStatus() != OrderStatus.PAID && o.getStatus() != OrderStatus.CANCELLED)
+            .filter(o -> o.getStatus() != OrderStatus.CANCELLED)
             .map(OrderDto::from)
             .collect(Collectors.toList());
     }
@@ -59,12 +59,12 @@ public class KitchenService {
 
         if (allCompleted) {
             order.setKitchenStatus(KitchenStatus.COMPLETED);
-            if (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.PREPARING) {
+            if (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.PREPARING || order.getStatus() == OrderStatus.PAID) {
                 order.setStatus(OrderStatus.READY);
             }
         } else if (anyPreparing) {
             order.setKitchenStatus(KitchenStatus.PREPARING);
-            if (order.getStatus() == OrderStatus.PENDING) {
+            if (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.PAID) {
                 order.setStatus(OrderStatus.PREPARING);
             }
         }

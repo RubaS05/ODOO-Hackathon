@@ -21,6 +21,7 @@ import { KDS } from '../pages/KDS';
 import { Reports } from '../pages/Reports';
 import { CustomerDisplay } from '../pages/CustomerDisplay';
 import { AdminDashboard } from '../pages/AdminDashboard';
+import { Settings } from '../pages/Settings';
 import TableEntry from '../pages/TableEntry';
 import CustomerDashboard from '../pages/CustomerDashboard';
 import { usePOSStore } from '../store/posStore';
@@ -74,6 +75,7 @@ export const AppRoutes = () => {
                 <Route path="/coupons" element={<DashboardLayout><CouponsPromotions /></DashboardLayout>} />
                 <Route path="/users" element={<DashboardLayout><UserManagement /></DashboardLayout>} />
                 <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
+                <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
             </Route>
 
             {/* Root route with role-based redirect */}

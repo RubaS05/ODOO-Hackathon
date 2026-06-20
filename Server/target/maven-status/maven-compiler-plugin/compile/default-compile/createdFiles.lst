@@ -16,6 +16,7 @@ com\cafepos\dto\UserDto.class
 com\cafepos\security\JwtUtil.class
 com\cafepos\entity\AppUser.class
 com\cafepos\service\OrderService.class
+com\cafepos\dto\CustomerDto.class
 com\cafepos\controller\AuthController.class
 com\cafepos\entity\Floor.class
 com\cafepos\entity\OrderItem.class
@@ -27,10 +28,12 @@ com\cafepos\controller\UserController.class
 com\cafepos\enums\OrderStatus.class
 com\cafepos\entity\Payment.class
 com\cafepos\security\JwtAuthFilter.class
+com\cafepos\controller\CustomerController.class
 com\cafepos\entity\RestaurantTable.class
 com\cafepos\controller\SessionController.class
 com\cafepos\dto\OrderItemRequest.class
 com\cafepos\dto\TableDto.class
+com\cafepos\repository\CouponRepository.class
 com\cafepos\repository\OrderItemRepository.class
 com\cafepos\enums\KitchenStatus.class
 com\cafepos\repository\ProductRepository.class
@@ -38,9 +41,11 @@ com\cafepos\dto\LoginRequest.class
 com\cafepos\service\TableService.class
 com\cafepos\enums\DiscountType.class
 com\cafepos\controller\TableController.class
+com\cafepos\config\WebSocketConfig.class
 com\cafepos\controller\PaymentMethodController.class
 com\cafepos\service\ProductService.class
 com\cafepos\repository\PosSessionRepository.class
+com\cafepos\repository\PromotionRepository.class
 com\cafepos\dto\SessionDto.class
 com\cafepos\repository\PosOrderRepository.class
 com\cafepos\controller\CategoryController.class
@@ -58,11 +63,15 @@ com\cafepos\dto\SessionOpenRequest.class
 com\cafepos\dto\OrderCreateRequest.class
 com\cafepos\security\CustomUserDetails.class
 com\cafepos\repository\RestaurantTableRepository.class
+com\cafepos\websocket\KdsWebSocketHandler.class
 com\cafepos\repository\AppUserRepository.class
 com\cafepos\entity\SelfOrderConfig.class
 com\cafepos\repository\FloorRepository.class
 com\cafepos\dto\AuthResponse$AuthResponseBuilder.class
 com\cafepos\dto\OrderDto.class
+com\cafepos\controller\CouponController.class
+com\cafepos\controller\FloorController.class
+com\cafepos\controller\PromotionController.class
 com\cafepos\dto\SignupRequest.class
 com\cafepos\controller\OrderController.class
 com\cafepos\repository\PaymentMethodRepository.class
@@ -72,4 +81,5 @@ com\cafepos\service\PaymentMethodService.class
 com\cafepos\dto\ChangePasswordRequest.class
 com\cafepos\service\KitchenService.class
 com\cafepos\service\ReceiptService.class
+com\cafepos\websocket\TableWebSocketHandler.class
 com\cafepos\entity\Category.class

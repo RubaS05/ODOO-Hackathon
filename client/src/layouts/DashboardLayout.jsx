@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Monitor, ClipboardList, Users, TableProperties, Package, Tags, CreditCard, Ticket, UserSquare2, ChefHat, BarChart3, LogOut, Sun, Moon, Bell, Menu, X, Clock, History } from 'lucide-react';
+import { LayoutGrid, Monitor, ClipboardList, Users, TableProperties, Package, Tags, CreditCard, Ticket, UserSquare2, ChefHat, BarChart3, LogOut, Sun, Moon, Bell, Menu, X, Clock, History, Settings as SettingsIcon } from 'lucide-react';
 import { usePOSStore } from '../store/posStore';
 import { Button } from '../components/ui/Button';
 export const DashboardLayout = ({ children }) => {
@@ -49,6 +49,7 @@ export const DashboardLayout = ({ children }) => {
         { name: 'Users / Employees', path: '/users', icon: UserSquare2, roles: ['ADMIN'] },
         { name: 'Kitchen (KDS)', path: '/kitchen', icon: ChefHat, roles: ['ADMIN', 'CHEF'] },
         { name: 'Reports', path: '/reports', icon: BarChart3, roles: ['ADMIN'] },
+        { name: 'Settings', path: '/settings', icon: SettingsIcon, roles: ['ADMIN'] },
     ];
     const menuItems = allMenuItems.filter(item => item.roles.includes(currentUser?.role || ''));
     return (<div className="min-h-screen bg-background text-foreground flex">

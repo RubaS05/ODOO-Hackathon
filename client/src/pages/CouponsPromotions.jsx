@@ -6,6 +6,9 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
+import { Pagination } from '../components/ui/Pagination';
+import { useEffect } from 'react';
+
 export const CouponsPromotions = () => {
     const { coupons, promotions, products, addCoupon, deleteCoupon, addPromotion, deletePromotion } = usePOSStore();
     // Tab states
@@ -13,6 +16,20 @@ export const CouponsPromotions = () => {
     // Modals
     const [couponModalOpen, setCouponModalOpen] = useState(false);
     const [promoModalOpen, setPromoModalOpen] = useState(false);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 10;
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab]);
+
+    const currentList = activeTab === 'coupons' ? coupons : promotions;
+    const totalPages = Math.ceil(currentList.length / rowsPerPage);
+    
+    const paginatedCoupons = coupons.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+    const paginatedPromotions = promotions.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+
     // Coupon form states
     const [couponCode, setCouponCode] = useState('');
     const [couponType, setCouponType] = useState('percentage');
@@ -98,7 +115,7 @@ export const CouponsPromotions = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {coupons.map((c) => (<TableRow key={c.id}>
+            {paginatedCoupons.map((c) => (<TableRow key={c.id}>
                 <TableCell className="font-mono font-bold text-xs">
                   <span className="bg-primary/10 text-primary px-2.5 py-1 rounded font-bold uppercase tracking-wider">
                     {c.code}
@@ -131,7 +148,7 @@ export const CouponsPromotions = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {promotions.map((p) => (<TableRow key={p.id}>
+            {paginatedPromotions.map((p) => (<TableRow key={p.id}>
                 <TableCell className="font-bold text-xs">{p.name}</TableCell>
                 <TableCell className="text-xs capitalize font-semibold text-muted-foreground">
                   {p.type === 'product' ? `Product: ${getProductName(p.productId || '')}` : 'Order Subtotal'}
@@ -152,6 +169,8 @@ export const CouponsPromotions = () => {
               </TableRow>))}
           </TableBody>
         </Table>)}
+        
+      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
       {/* MODALS */}
 

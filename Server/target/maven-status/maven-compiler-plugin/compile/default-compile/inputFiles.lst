@@ -1,3 +1,4 @@
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\config\WebSocketConfig.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\AuthController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\CategoryController.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\controller\KitchenController.java
@@ -72,3 +73,4 @@ D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\ReceiptService.ja
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\SessionService.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\TableService.java
 D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\service\UserService.java
+D:\Prathaban\ODO-Hack\Server\src\main\java\com\cafepos\websocket\KdsWebSocketHandler.java

@@ -62,7 +62,7 @@ export const AppRoutes = () => {
 
             {/* Chef & Admin Route */}
             <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'CHEF']} />}>
-                <Route path="/kitchen" element={<DashboardLayout><KDS /></DashboardLayout>} />
+                <Route path="/kitchen" element={<KDS />} />
             </Route>
 
             {/* Admin Only Routes */}

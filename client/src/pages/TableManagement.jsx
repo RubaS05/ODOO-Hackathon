@@ -10,6 +10,7 @@ import { Select } from '../components/ui/Select';
 import { Input } from '../components/ui/Input';
 import { generateQrDataUrl } from '../services/qrService';
 import { apiService } from '../services/api';
+import { Pagination } from '../components/ui/Pagination';
 
 export const TableManagement = () => {
     const navigate = useNavigate();
@@ -21,6 +22,9 @@ export const TableManagement = () => {
     const [selectedFloor, setSelectedFloor] = useState('');
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [activeTableDetail, setActiveTableDetail] = useState(null);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 10;
 
     // New Table Form States
     const [newTableNo, setNewTableNo] = useState('');
@@ -42,6 +46,13 @@ export const TableManagement = () => {
     const filteredTables = useMemo(() => {
         return tables.filter((t) => t.floor === selectedFloor);
     }, [tables, selectedFloor]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedFloor]);
+
+    const totalPages = Math.ceil(filteredTables.length / rowsPerPage);
+    const paginatedTables = filteredTables.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
     // Click always opens detail modal
     const handleTableClick = (table) => {
@@ -215,7 +226,7 @@ export const TableManagement = () => {
 
             {/* Tables Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {filteredTables.map((table) => (
+                {paginatedTables.map((table) => (
                     <Card
                         key={table.id}
                         onClick={() => handleTableClick(table)}
@@ -239,12 +250,14 @@ export const TableManagement = () => {
                         </CardContent>
                     </Card>
                 ))}
-                {filteredTables.length === 0 && (
+                {paginatedTables.length === 0 && (
                     <div className="col-span-full text-center py-12 text-muted-foreground text-sm">
                         No tables on this floor yet. Add a new table above.
                     </div>
                 )}
             </div>
+            
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
             {/* ── Create Table Modal ─────────────────────────────────────── */}
             <Modal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} title="Add New Table">

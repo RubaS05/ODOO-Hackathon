@@ -8,6 +8,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
+import { Pagination } from '../components/ui/Pagination';
+import { useEffect } from 'react';
 
 export const ProductManagement = () => {
     const queryClient = useQueryClient();
@@ -45,6 +47,8 @@ export const ProductManagement = () => {
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
     const [modalOpen, setModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 10;
 
     // Form States
     const [name, setName] = useState('');
@@ -66,6 +70,13 @@ export const ProductManagement = () => {
             return matchesSearch && matchesCategory;
         });
     }, [products, searchTerm, selectedCategoryFilter]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, selectedCategoryFilter]);
+
+    const totalPages = Math.ceil(filteredProducts.length / rowsPerPage);
+    const paginatedProducts = filteredProducts.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
     const handleOpenCreate = () => {
         setEditingProduct(null);
@@ -180,7 +191,7 @@ export const ProductManagement = () => {
             <TableRow>
                 <TableCell colSpan={5} className="text-center py-12 text-muted-foreground text-xs">Loading...</TableCell>
             </TableRow>
-          ) : filteredProducts.length > 0 ? (filteredProducts.map((p) => {
+          ) : paginatedProducts.length > 0 ? (paginatedProducts.map((p) => {
             const catId = p.category?.id || p.categoryId;
             const catColor = getCategoryColor(catId);
             return (<TableRow key={p.id}>
@@ -216,6 +227,7 @@ export const ProductManagement = () => {
             </TableRow>)}
         </TableBody>
       </Table>
+      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
       {/* Create / Edit Modal Form */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingProduct ? 'Edit Menu Item' : 'Add New Menu Item'}>

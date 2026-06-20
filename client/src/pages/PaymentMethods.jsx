@@ -7,12 +7,19 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
+import { Pagination } from '../components/ui/Pagination';
+
 export const PaymentMethods = () => {
     const { paymentMethods, togglePaymentMethodStatus, addPaymentMethod, updatePaymentMethod } = usePOSStore();
     // States
     const [modalOpen, setModalOpen] = useState(false);
     const [name, setName] = useState('');
     const [type, setType] = useState('cash');
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 10;
+    const totalPages = Math.ceil(paymentMethods.length / rowsPerPage);
+    const paginatedPaymentMethods = paymentMethods.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!name)
@@ -59,7 +66,7 @@ export const PaymentMethods = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paymentMethods.map((pm) => (<TableRow key={pm.id}>
+              {paginatedPaymentMethods.map((pm) => (<TableRow key={pm.id}>
                   <TableCell className="font-bold text-xs">
                     <div className="flex items-center gap-2.5">
                       {getIcon(pm.type)}
@@ -82,6 +89,7 @@ export const PaymentMethods = () => {
                 </TableRow>))}
             </TableBody>
           </Table>
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
 
         {/* UPI QR Preview Side Panel (4 cols) */}

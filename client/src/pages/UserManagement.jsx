@@ -7,6 +7,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
+import { Pagination } from '../components/ui/Pagination';
 import { apiService } from '../services/api';
 
 export const UserManagement = () => {
@@ -62,6 +63,16 @@ export const UserManagement = () => {
     const filteredUsers = filterRole === 'ALL'
         ? users
         : users.filter(u => u.role === filterRole);
+
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const rowsPerPage = 10;
+    
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [filterRole]);
+
+    const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+    const paginatedUsers = filteredUsers.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
     const handleOpenCreate = () => {
         setSelectedUser(null);
@@ -193,13 +204,13 @@ export const UserManagement = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredUsers.length === 0 ? (
+                        {paginatedUsers.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center py-12 text-muted-foreground text-sm">
                                     No users found. Add your first user to get started.
                                 </TableCell>
                             </TableRow>
-                        ) : filteredUsers.map((user) => (
+                        ) : paginatedUsers.map((user) => (
                             <TableRow key={user.id} className={user.status === 'inactive' ? 'opacity-50' : ''}>
                                 <TableCell>
                                     <div className="flex items-center gap-3">
@@ -255,6 +266,7 @@ export const UserManagement = () => {
                     </TableBody>
                 </Table>
             </div>
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
             {/* Add User Modal */}
             <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Add New User">

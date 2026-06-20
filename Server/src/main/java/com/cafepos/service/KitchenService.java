@@ -22,6 +22,7 @@ public class KitchenService {
 
     private final PosOrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final com.cafepos.websocket.KdsWebSocketHandler kdsWebSocketHandler;
 
     /**
      * Returns all active kitchen orders: those not yet PAID or CANCELLED.
@@ -67,7 +68,13 @@ public class KitchenService {
                 order.setStatus(OrderStatus.PREPARING);
             }
         }
-        return OrderDto.from(orderRepository.save(order));
+        PosOrder saved = orderRepository.save(order);
+        OrderDto dto = OrderDto.from(saved);
+        kdsWebSocketHandler.broadcastUpdate(java.util.Map.of(
+            "type", "UPDATE_ORDER",
+            "payload", dto
+        ));
+        return dto;
     }
 
     /**
@@ -95,6 +102,12 @@ public class KitchenService {
             order.setStatus(OrderStatus.READY);
         }
 
-        return OrderDto.from(orderRepository.save(order));
+        PosOrder saved = orderRepository.save(order);
+        OrderDto dto = OrderDto.from(saved);
+        kdsWebSocketHandler.broadcastUpdate(java.util.Map.of(
+            "type", "UPDATE_ORDER",
+            "payload", dto
+        ));
+        return dto;
     }
 }

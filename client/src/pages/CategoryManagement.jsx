@@ -6,6 +6,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { Pagination } from '../components/ui/Pagination';
 
 const PREMIUM_COLORS = [
     '#ec4899', '#f97316', '#eab308', '#a855f7', '#06b6d4', '#10b981',
@@ -40,6 +41,10 @@ export const CategoryManagement = () => {
     // State
     const [modalOpen, setModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 10;
+    const totalPages = Math.ceil(categories.length / rowsPerPage);
+    const paginatedCategories = categories.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
     // Form States
     const [name, setName] = useState('');
@@ -106,7 +111,7 @@ export const CategoryManagement = () => {
             <TableRow>
                 <TableCell colSpan={4} className="text-center py-12 text-muted-foreground text-xs">Loading categories...</TableCell>
             </TableRow>
-          ) : categories.length > 0 ? (categories.map((cat) => (<TableRow key={cat.id}>
+          ) : paginatedCategories.length > 0 ? (paginatedCategories.map((cat) => (<TableRow key={cat.id}>
                 <TableCell className="font-bold text-xs">{cat.name}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -132,6 +137,7 @@ export const CategoryManagement = () => {
             </TableRow>)}
         </TableBody>
       </Table>
+      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
       {/* Create / Edit Modal Form */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingCategory ? 'Edit Category' : 'Create Category'}>

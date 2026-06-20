@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { Pagination } from '../components/ui/Pagination';
 
 export const Orders = () => {
     const [orders, setOrders] = useState([]);
@@ -14,6 +15,8 @@ export const Orders = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 10;
 
     const loadOrders = async () => {
         try {
@@ -46,6 +49,14 @@ export const Orders = () => {
             return matchesSearch && statusMatches;
         });
     }, [orders, searchTerm, statusFilter]);
+
+    // Reset pagination when search or filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter]);
+
+    const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
+    const paginatedOrders = filteredOrders.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
     const handlePayBill = async (orderId) => {
         if (confirm('Are you sure you want to mark this bill as PAID?')) {
@@ -118,8 +129,8 @@ export const Orders = () => {
                         <TableRow>
                             <TableCell colSpan={7} className="text-center py-12 text-muted-foreground text-xs">Loading orders...</TableCell>
                         </TableRow>
-                    ) : filteredOrders.length > 0 ? (
-                        filteredOrders.map((order) => (
+                    ) : paginatedOrders.length > 0 ? (
+                        paginatedOrders.map((order) => (
                             <TableRow key={order.id}>
                                 <TableCell className="font-mono font-bold text-xs">{order.orderNumber}</TableCell>
                                 <TableCell className="text-xs">{new Date(order.orderDate).toLocaleString()}</TableCell>
@@ -149,6 +160,7 @@ export const Orders = () => {
                     )}
                 </TableBody>
             </Table>
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
             <Modal isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} title={`Order Details: ${selectedOrder?.orderNumber}`} size="md">
                 {selectedOrder && (

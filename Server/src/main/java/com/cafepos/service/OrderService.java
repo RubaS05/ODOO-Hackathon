@@ -7,6 +7,7 @@ import com.cafepos.enums.KitchenStatus;
 import com.cafepos.enums.OrderStatus;
 import com.cafepos.enums.SessionStatus;
 import com.cafepos.repository.*;
+import com.cafepos.websocket.KdsWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class OrderService {
     private final CustomerRepository customerRepository;
     private final ReceiptService receiptService;
     private final EmailService emailService;
+    private final KdsWebSocketHandler kdsWebSocketHandler;
 
     @Transactional
     public OrderDto createOrder(AppUser employee, OrderCreateRequest request) {
@@ -94,10 +96,17 @@ public class OrderService {
             }
         }
 
+        BigDecimal discount = request.getDiscountAmount() != null ? request.getDiscountAmount() : BigDecimal.ZERO;
+        
+        // Ensure discount doesn't exceed subtotal
+        if (discount.compareTo(subtotal) > 0) {
+            discount = subtotal;
+        }
+
         order.setSubtotal(subtotal);
         order.setTaxAmount(tax);
-        order.setDiscountAmount(BigDecimal.ZERO);
-        order.setTotalAmount(subtotal.add(tax));
+        order.setDiscountAmount(discount);
+        order.setTotalAmount(subtotal.add(tax).subtract(discount).max(BigDecimal.ZERO));
 
         // Determine initial status
         if (request.isSendToKitchen()) {
@@ -118,6 +127,13 @@ public class OrderService {
         if (saved.getStatus() == OrderStatus.PAID && saved.getCustomer() != null && saved.getCustomer().getEmail() != null) {
             String htmlReceipt = receiptService.generateReceiptHtml(dto);
             emailService.sendReceiptEmail(saved.getCustomer().getEmail(), saved.getCustomer().getName(), saved.getOrderNumber(), htmlReceipt);
+        }
+
+        if (request.isSendToKitchen()) {
+            kdsWebSocketHandler.broadcastUpdate(java.util.Map.of(
+                "type", "NEW_ORDER",
+                "payload", dto
+            ));
         }
 
         return dto;
@@ -193,13 +209,31 @@ public class OrderService {
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setTotalAmount(subtotal.add(tax));
 
-        // Always send to kitchen directly for public orders
-        order.setStatus(OrderStatus.PENDING);
-        order.setKitchenStatus(KitchenStatus.TO_COOK);
-        order.setSentToKitchenAt(LocalDateTime.now());
+        if (request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank()) {
+            order.setStatus(OrderStatus.PAID);
+            order.setKitchenStatus(KitchenStatus.TO_COOK);
+            order.setSentToKitchenAt(LocalDateTime.now());
+        } else {
+            // Fallback (though frontend now forces payment)
+            order.setStatus(OrderStatus.PENDING);
+            order.setKitchenStatus(KitchenStatus.TO_COOK);
+            order.setSentToKitchenAt(LocalDateTime.now());
+        }
 
         PosOrder saved = orderRepository.save(order);
-        return OrderDto.from(saved);
+        OrderDto dto = OrderDto.from(saved);
+
+        // Send email if paid immediately
+        if (saved.getStatus() == OrderStatus.PAID && saved.getCustomer() != null && saved.getCustomer().getEmail() != null) {
+            String htmlReceipt = receiptService.generateReceiptHtml(dto);
+            emailService.sendReceiptEmail(saved.getCustomer().getEmail(), saved.getCustomer().getName(), saved.getOrderNumber(), htmlReceipt);
+        }
+
+        kdsWebSocketHandler.broadcastUpdate(java.util.Map.of(
+            "type", "NEW_ORDER",
+            "payload", dto
+        ));
+        return dto;
     }
 
     @Transactional
@@ -245,6 +279,7 @@ public class OrderService {
         }
 
         PosOrder saved = orderRepository.save(order);
+        kdsWebSocketHandler.broadcastUpdate();
         return OrderDto.from(saved);
     }
 

@@ -193,6 +193,25 @@ export const apiService = {
         },
     },
 
+    /* ─── CUSTOMERS ──────────────────────────────────────────── */
+    customers: {
+        getAll: async () => {
+            const res = await apiClient.get('/customers');
+            return res.data;
+        },
+        create: async (customer) => {
+            const res = await apiClient.post('/customers', customer);
+            return res.data;
+        },
+        update: async (id, updates) => {
+            const res = await apiClient.put(`/customers/${id}`, updates);
+            return res.data;
+        },
+        delete: async (id) => {
+            await apiClient.delete(`/customers/${id}`);
+        },
+    },
+
     /* ─── PAYMENT METHODS ────────────────────────────────────── */
     paymentMethods: {
         getAll: async () => {

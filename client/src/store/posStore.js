@@ -131,7 +131,7 @@ export const usePOSStore = create()(persist((set, get) => ({
     },
     setCartNotes: (cartNotes) => set({ cartNotes }),
     getCartTotals: () => {
-        const { cart, activeCoupon } = get();
+        const { cart, activeCoupon, promotions } = get();
         let subtotal = 0;
         let tax = 0;
         cart.forEach((item) => {
@@ -139,17 +139,54 @@ export const usePOSStore = create()(persist((set, get) => ({
             subtotal += itemTotal;
             tax += itemTotal * item.product.taxRate;
         });
-        let discount = 0;
-        if (activeCoupon) {
-            if (activeCoupon.discountType === 'percentage') {
-                discount = subtotal * (activeCoupon.value / 100);
-            }
-            else {
-                discount = activeCoupon.value;
-            }
-            // Make sure discount doesn't exceed subtotal
-            discount = Math.min(discount, subtotal);
+
+        let promoDiscount = 0;
+
+        // Evaluate automated promotions
+        if (promotions && promotions.length > 0) {
+            promotions.forEach(promo => {
+                let isEligible = false;
+                if (promo.type === 'product' && promo.productId) {
+                    const cartItem = cart.find(i => i.product.id === promo.productId);
+                    if (cartItem && cartItem.quantity >= (promo.minQuantity || 1)) {
+                        isEligible = true;
+                    }
+                } else if (promo.type === 'order') {
+                    if (subtotal >= (promo.minAmount || 0)) {
+                        isEligible = true;
+                    }
+                }
+
+                if (isEligible) {
+                    let calculatedDiscount = 0;
+                    if (promo.discountType === 'percentage') {
+                        calculatedDiscount = subtotal * (promo.discountValue / 100);
+                    } else {
+                        calculatedDiscount = promo.discountValue;
+                    }
+                    if (calculatedDiscount > promoDiscount) {
+                        promoDiscount = calculatedDiscount;
+                    }
+                }
+            });
         }
+
+        let couponDiscount = 0;
+        if (activeCoupon) {
+            // Check if coupon has minimum amount
+            if (!activeCoupon.minAmount || subtotal >= activeCoupon.minAmount) {
+                if (activeCoupon.discountType === 'percentage') {
+                    couponDiscount = subtotal * (activeCoupon.value / 100);
+                } else {
+                    couponDiscount = activeCoupon.value;
+                }
+            }
+        }
+
+        // Apply both discounts but ensure we don't discount more than the subtotal
+        let discount = promoDiscount + couponDiscount;
+        discount = Math.min(discount, subtotal);
+
         const total = Math.max(0, subtotal + tax - discount);
         return {
             subtotal: parseFloat(subtotal.toFixed(2)),
@@ -221,6 +258,7 @@ export const usePOSStore = create()(persist((set, get) => ({
         return newOrder;
     },
     // Customers
+    setCustomers: (customers) => set({ customers }),
     addCustomer: (cust) => set((state) => ({
         customers: [...state.customers, { ...cust, id: `cust-${Date.now()}` }],
     })),
@@ -230,6 +268,8 @@ export const usePOSStore = create()(persist((set, get) => ({
     deleteCustomer: (id) => set((state) => ({
         customers: state.customers.filter((c) => c.id !== id),
     })),
+    // Coupons
+    setCoupons: (coupons) => set({ coupons }),
     // Orders
     createOrder: (paymentDetails, isDraft = false) => {
         const { cart, activeCustomer, activeTable, orderType, cartNotes, getCartTotals } = get();

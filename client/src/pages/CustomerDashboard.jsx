@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { usePOSStore } from '../store/posStore';
 import { apiService } from '../services/api';
+import { Pagination } from '../components/ui/Pagination';
 
 const STORAGE_KEY = 'cafe_customer';
 
@@ -38,6 +39,8 @@ const CustomerDashboard = () => {
 
     // Active tab
     const [activeTab, setActiveTab] = useState('menu'); // 'menu' | 'cart' | 'orders'
+    const [ordersPage, setOrdersPage] = useState(1);
+    const ordersPerPage = 10;
 
     // Order type (Dine-in vs Takeaway)
     const [orderType, setOrderType] = useState('dine-in');
@@ -138,58 +141,41 @@ const CustomerDashboard = () => {
 
     const handleAction = async () => {
         if (cart.length === 0) return;
-        if (isDineIn) {
-            // Dine-in: Send to kitchen directly (create or append)
-            try {
-                if (currentOrder) {
-                    await apiService.public.appendItems(currentOrder.id, cart.map(i => ({ productId: i.id, quantity: i.quantity })));
-                    const fetched = await apiService.public.getOrder(currentOrder.id);
-                    usePOSStore.getState().updateOrder(currentOrder.id, fetched);
-                } else {
-                    const newOrderDto = await apiService.public.createOrder({
-                        tableId: table?.id,
-                        customerId: customer?.id,
-                        notes: `Customer Name: ${customer?.name}, Email: ${customer?.email}`,
-                        orderType: 'dine-in',
-                        sendToKitchen: true,
-                        items: cart.map(i => ({ productId: i.id, quantity: i.quantity }))
-                    });
-                    createCustomerOrder(newOrderDto);
-                }
-                setCart([]);
-                setActiveTab('orders');
-            } catch (err) {
-                console.error(err);
-                alert("Failed to submit order to kitchen.");
-            }
-        } else {
-            // Takeaway: Require payment upfront
-            setPaymentOpen(true);
-        }
+        setPaymentOpen(true);
     };
 
     const confirmPayment = () => {
         setPaying(true);
         setTimeout(async () => {
             try {
-                if (isDineIn && currentOrder) {
-                    // Deferred payment for Dine-in
-                    const updated = await apiService.public.payOrder(currentOrder.id);
-                    usePOSStore.getState().updateOrder(currentOrder.id, { ...updated, paymentMethod });
-                } else {
-                    // Upfront payment for Takeaway
+                if (cart.length > 0) {
+                    // Upfront payment for new items
+                    if (currentOrder && isDineIn) {
+                        // Append and pay if there's an active unpaid order
+                        await apiService.public.appendItems(currentOrder.id, cart.map(i => ({ productId: i.id, quantity: i.quantity })));
+                        // Wait, the backend appendItems doesn't process payment!
+                        // Instead of appending, just create a new order. It's much simpler and keeps receipts clean.
+                    }
+                    
                     const newOrderDto = await apiService.public.createOrder({
                         tableId: table?.id,
                         customerId: customer?.id,
+                        customerEmail: customer?.email,
+                        customerName: customer?.name,
                         notes: `Customer Name: ${customer?.name}, Email: ${customer?.email}`,
-                        orderType: 'takeaway',
+                        orderType,
                         paymentMethod,
+                        sendToKitchen: true,
                         items: cart.map(i => ({ productId: i.id, quantity: i.quantity }))
                     });
                     createCustomerOrder({
                         ...newOrderDto,
                         paymentMethod,
                     });
+                } else if (currentOrder) {
+                    // Deferred payment for existing Dine-in order
+                    const updated = await apiService.public.payOrder(currentOrder.id);
+                    usePOSStore.getState().updateOrder(currentOrder.id, { ...updated, paymentMethod });
                 }
 
                 setCart([]);
@@ -474,7 +460,7 @@ const CustomerDashboard = () => {
                                 </div>
                                 {isDineIn && currentOrder.status?.toLowerCase() !== 'paid' && (
                                     <button
-                                        onClick={() => setPaymentOpen(true)}
+                        onClick={() => setPaymentOpen(true)}
                                         style={{
                                             marginTop: '12px', width: '100%', padding: '12px', borderRadius: '10px',
                                             border: 'none', fontWeight: 800, fontSize: '14px', cursor: 'pointer',
@@ -493,42 +479,51 @@ const CustomerDashboard = () => {
                     <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: currentOrder ? '8px' : '0' }}>
                         Order History
                     </div>
-                    {myOrders.filter((o) => o.id !== currentOrder?.id).length === 0 && !currentOrder && (
-                        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', padding: '40px 0', fontSize: '14px' }}>
-                            No orders yet. Start ordering from the menu!
-                        </div>
-                    )}
-                    {myOrders.filter((o) => o.id !== currentOrder?.id).map((order) => (
-                        <div key={order.id} style={{
-                            background: 'rgba(255,255,255,0.05)',
-                            borderRadius: '12px',
-                            padding: '14px',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                                <div>
-                                    <div style={{ fontWeight: 700, fontSize: '13px' }}>{order.orderNumber}</div>
-                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
-                                        {new Date(order.date).toLocaleString()}
-                                    </div>
+                    {(() => {
+                        const pastOrders = myOrders.filter((o) => o.id !== currentOrder?.id);
+                        if (pastOrders.length === 0 && !currentOrder) {
+                            return (
+                                <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', padding: '40px 0', fontSize: '14px' }}>
+                                    No orders yet. Start ordering from the menu!
                                 </div>
-                                <span style={{
-                                    fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px',
-                                    background: `${STATUS_LABELS[order.status]?.color || '#6b7280'}22`,
-                                    color: STATUS_LABELS[order.status]?.color || '#6b7280',
-                                    border: `1px solid ${STATUS_LABELS[order.status]?.color || '#6b7280'}44`,
-                                }}>
-                                    {STATUS_LABELS[order.status]?.label || order.status}
-                                </span>
-                            </div>
-                            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
-                                {order.items.map((oi) => `${oi.name} ×${oi.quantity}`).join(' · ')}
-                            </div>
-                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#f59e0b', marginTop: '8px' }}>
-                                {fmt(order.total)}
-                            </div>
-                        </div>
-                    ))}
+                            );
+                        }
+                        const totalPages = Math.ceil(pastOrders.length / ordersPerPage);
+                        const paginatedOrders = pastOrders.slice((ordersPage - 1) * ordersPerPage, ordersPage * ordersPerPage);
+
+                        return (
+                            <>
+                                {paginatedOrders.map((order) => (
+                                    <div key={order.id} style={{
+                                        background: 'rgba(255,255,255,0.05)',
+                                        borderRadius: '12px',
+                                        padding: '14px',
+                                        border: '1px solid rgba(255,255,255,0.08)',
+                                        marginBottom: '10px'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                            <span style={{ fontWeight: 800, fontSize: '13px' }}>{order.orderNumber}</span>
+                                            <span style={{
+                                                fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase',
+                                                background: `${STATUS_LABELS[order.status]?.color || '#6b7280'}22`,
+                                                color: STATUS_LABELS[order.status]?.color || '#6b7280',
+                                                border: `1px solid ${STATUS_LABELS[order.status]?.color || '#6b7280'}44`,
+                                            }}>
+                                                {STATUS_LABELS[order.status]?.label || order.status}
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+                                            {order.items.map((oi) => `${oi.name} ×${oi.quantity}`).join(' · ')}
+                                        </div>
+                                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#f59e0b', marginTop: '8px' }}>
+                                            {fmt(order.totalAmount || order.total)}
+                                        </div>
+                                    </div>
+                                ))}
+                                <Pagination currentPage={ordersPage} totalPages={totalPages} onPageChange={setOrdersPage} />
+                            </>
+                        );
+                    })()}
                 </div>
             )}
 

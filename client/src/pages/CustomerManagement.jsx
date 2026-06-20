@@ -1,27 +1,64 @@
-import React, { useState, useMemo } from 'react';
-import { Search, UserPlus, Edit2, Trash2 } from 'lucide-react';
-import { usePOSStore } from '../store/posStore';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, UserPlus, Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiService } from '../services/api';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { Pagination } from '../components/ui/Pagination';
+
 export const CustomerManagement = () => {
-    const { customers, addCustomer, updateCustomer, deleteCustomer } = usePOSStore();
+    const queryClient = useQueryClient();
+    
+    const { data: customers = [], isLoading } = useQuery({
+        queryKey: ['customers'],
+        queryFn: apiService.customers.getAll
+    });
+
+    const createMutation = useMutation({
+        mutationFn: apiService.customers.create,
+        onSuccess: () => queryClient.invalidateQueries(['customers'])
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }) => apiService.customers.update(id, data),
+        onSuccess: () => queryClient.invalidateQueries(['customers'])
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: apiService.customers.delete,
+        onSuccess: () => queryClient.invalidateQueries(['customers'])
+    });
+
     // State
     const [searchTerm, setSearchTerm] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 10;
+    
     // Form States
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
+    
     // Filter customers list
     const filteredCustomers = useMemo(() => {
-        return customers.filter((c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.phone.includes(searchTerm));
+        return customers.filter((c) => c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.phone?.includes(searchTerm));
     }, [customers, searchTerm]);
+    
+    // Reset pagination when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
+    const paginatedCustomers = filteredCustomers.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+
     const handleOpenCreate = () => {
         setEditingCustomer(null);
         setName('');
@@ -38,7 +75,7 @@ export const CustomerManagement = () => {
     };
     const handleDelete = (customerId) => {
         if (confirm('Are you sure you want to delete this customer?')) {
-            deleteCustomer(customerId);
+            deleteMutation.mutate(customerId);
         }
     };
     const handleSubmit = (e) => {
@@ -46,10 +83,10 @@ export const CustomerManagement = () => {
         if (!name)
             return;
         if (editingCustomer) {
-            updateCustomer(editingCustomer.id, { name, email, phone });
+            updateMutation.mutate({ id: editingCustomer.id, data: { name, email, phone } });
         }
         else {
-            addCustomer({ name, email, phone });
+            createMutation.mutate({ name, email, phone });
         }
         setModalOpen(false);
         setName('');
@@ -90,7 +127,14 @@ export const CustomerManagement = () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredCustomers.length > 0 ? (filteredCustomers.map((cust) => (<TableRow key={cust.id}>
+          {isLoading ? (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center py-12 text-muted-foreground text-xs">
+                 <RefreshCw className="animate-spin mx-auto mb-2" size={24} />
+                 Loading customers...
+              </TableCell>
+            </TableRow>
+          ) : paginatedCustomers.length > 0 ? (paginatedCustomers.map((cust) => (<TableRow key={cust.id}>
                 <TableCell className="font-bold text-xs">{cust.name}</TableCell>
                 <TableCell className="text-xs font-mono">{cust.email}</TableCell>
                 <TableCell className="text-xs font-mono">{cust.phone}</TableCell>
@@ -111,13 +155,15 @@ export const CustomerManagement = () => {
             </TableRow>)}
         </TableBody>
       </Table>
+      
+      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
       {/* Create / Edit Modal Form */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingCustomer ? 'Edit Customer' : 'Add New Customer'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Full Name" placeholder="e.g. Alice Johnson" value={name} onChange={(e) => setName(e.target.value)} required/>
-          <Input label="Email Address" type="email" placeholder="e.g. alice@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required/>
-          <Input label="Phone Number" placeholder="e.g. +1 555-0100" value={phone} onChange={(e) => setPhone(e.target.value)} required/>
+          <Input label="Email Address" type="email" placeholder="e.g. alice@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input label="Phone Number" placeholder="e.g. +1 555-0100" value={phone} onChange={(e) => setPhone(e.target.value)} />
 
           <Button type="submit" className="w-full font-bold">
             {editingCustomer ? 'Save Changes' : 'Create Customer'}

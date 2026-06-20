@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
+import { Pagination } from '../components/ui/Pagination';
 import { apiService } from '../services/api';
 import {
     Table,
@@ -21,6 +22,11 @@ export const SessionHistory = () => {
     const [sessionOrders, setSessionOrders] = useState([]);
     const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false);
     const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 10;
+    const totalPages = Math.ceil(sessions.length / rowsPerPage);
+    const paginatedSessions = sessions.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
     useEffect(() => {
         loadSessions();
@@ -130,21 +136,21 @@ export const SessionHistory = () => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {sessions.length > 0 ? (
-                                sessions.map((session) => (
+                            {paginatedSessions.length > 0 ? (
+                                paginatedSessions.map((session) => (
                                     <TableRow key={session.id}>
                                         <TableCell className="font-mono text-xs">#{session.id}</TableCell>
                                         <TableCell className="text-sm">
                                             <div className="flex items-center gap-1.5">
                                                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                                {formatDate(session.openingTime)}
+                                                {formatDate(session.openedAt)}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {session.closingTime ? (
+                                            {session.closedAt ? (
                                                 <div className="flex items-center gap-1.5">
                                                     <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                                    {formatDate(session.closingTime)}
+                                                    {formatDate(session.closedAt)}
                                                 </div>
                                             ) : (
                                                 <span className="text-muted-foreground italic text-xs">In Progress</span>
@@ -177,6 +183,7 @@ export const SessionHistory = () => {
                             )}
                         </TableBody>
                     </Table>
+                    <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                 </CardContent>
             </Card>
 

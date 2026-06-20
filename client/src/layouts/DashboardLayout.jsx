@@ -69,7 +69,8 @@ export const DashboardLayout = ({ children }) => {
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
-            return (<Link key={item.name} to={item.path} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${isActive
+            const isKds = item.path === '/kitchen';
+            return (<Link key={item.name} to={item.path} target={isKds ? "_blank" : undefined} rel={isKds ? "noopener noreferrer" : undefined} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${isActive && !isKds
                     ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}>
                 <Icon size={18}/>
@@ -112,7 +113,8 @@ export const DashboardLayout = ({ children }) => {
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
-                return (<Link key={item.name} to={item.path} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${isActive
+                const isKds = item.path === '/kitchen';
+                return (<Link key={item.name} to={item.path} target={isKds ? "_blank" : undefined} rel={isKds ? "noopener noreferrer" : undefined} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${isActive && !isKds
                         ? 'bg-primary text-primary-foreground shadow-md'
                         : 'text-muted-foreground hover:bg-accent'}`}>
                     <Icon size={18}/>

@@ -14,7 +14,8 @@ export const POSOrder = () => {
         cart, activeCustomer, activeTable, activeCoupon, orderType, cartNotes,
         customers, coupons, paymentMethods, addToCart, removeFromCart,
         updateCartQuantity, clearCart, assignCustomer, assignTable, applyCoupon,
-        setOrderType, setCartNotes, getCartTotals, addCustomer
+        setOrderType, setCartNotes, getCartTotals, addCustomer,
+        setCustomers, setCoupons
     } = usePOSStore();
 
     // Local state for API data
@@ -62,8 +63,11 @@ export const POSOrder = () => {
                     setCurrentSession(session);
                     const prods = await apiService.products.getAll();
                     const cats = await apiService.categories.getAll();
+                    const custs = await apiService.customers.getAll();
+                    
                     setProducts(prods || []);
                     setCategories(cats || []);
+                    setCustomers(custs || []);
                 } else {
                     setCurrentSession(null);
                 }
@@ -130,7 +134,9 @@ export const POSOrder = () => {
             customerPhone: checkoutPhone || undefined,
             items: items,
             sendToKitchen: isSendToKitchen,
-            paymentMethod: paymentMethod
+            paymentMethod: paymentMethod,
+            discountAmount: getCartTotals().discount,
+            couponCode: activeCoupon?.code || undefined
         };
 
         try {

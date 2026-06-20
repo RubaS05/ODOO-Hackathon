@@ -21,4 +21,5 @@ public class OrderCreateRequest {
     private BigDecimal amountReceived;    // for cash
     private String transactionReference;  // for card
     private boolean sendToKitchen = false;
+    private BigDecimal discountAmount;
 }
